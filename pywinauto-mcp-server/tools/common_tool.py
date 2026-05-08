@@ -34,6 +34,7 @@ def register_common_tools(mcp, app_manager):
         
         Args:
             caller: Identifier of the calling module/function
+            extra_args: Additional command-line arguments to pass to the app (optional, e.g. ["--disable-extensions", "--start-maximized"])
             scenario: Test scenario name (for logging)
             step: Current test step description (for logging)
             step_raw: Raw original step text

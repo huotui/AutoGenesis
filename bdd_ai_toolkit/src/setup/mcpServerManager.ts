@@ -52,7 +52,8 @@ export class McpServerManager {
     // Generate server name based on project and server type to support multiple servers
     const projectBaseName = path.basename(projectPath);
     const serverTypeSuffix =
-      serverType === "windows-browser" ? "windows" : "appium";
+      serverType === "windows-browser" ? "windows" : 
+      serverType === "playwright-web" ? "playwright" : "appium";
     const serverName = `auto-genesis-extension-${projectBaseName}-${serverTypeSuffix}`;
     console.log(`Setting up MCP server: ${serverName}`);
 
@@ -524,6 +525,17 @@ export class McpServerManager {
       console.log(`Added SSE server configuration: ${sseServerName}`);
     }
 
+    // For playwright-web server type, also add an SSE server configuration
+    if (serverConfig.serverType === "playwright-web") {
+      const sseServerName = `${serverConfig.name}-sse`;
+      const sseConfig = {
+        type: "sse",
+        url: "http://localhost:8000/sse",
+      };
+      mcpConfig.servers[sseServerName] = sseConfig;
+      console.log(`Added SSE server configuration: ${sseServerName}`);
+    }
+
     // Store configuration in workspace settings instead of global settings
     await config.update("mcp", mcpConfig, vscode.ConfigurationTarget.Workspace);
   }
@@ -675,6 +687,40 @@ export class McpServerManager {
       return {};
     }
   }
+
+  private async extractPlaywrightConfig(serverPath: string): Promise<any> {
+    try {
+      const confJsonPath = path.join(serverPath, "conf", "playwright_conf.json");
+
+      if (!fs.existsSync(confJsonPath)) {
+        console.warn(`conf/playwright_conf.json not found at: ${confJsonPath}`);
+        return {};
+      }
+
+      const content = fs.readFileSync(confJsonPath, "utf8");
+      try {
+        const playwrightConf = JSON.parse(content);
+
+        console.log(
+          "Successfully extracted and processed PLAYWRIGHT_CONFIG from conf/playwright_conf.json"
+        );
+        return playwrightConf;
+      } catch (parseError) {
+        console.warn(
+          "Failed to parse conf/playwright_conf.json as JSON:",
+          parseError
+        );
+        return {};
+      }
+    } catch (error) {
+      console.error(
+        "Error extracting PLAYWRIGHT_CONFIG from conf/playwright_conf.json:",
+        error
+      );
+      return {};
+    }
+  }
+
   /**
    * Ensure bdd_ai_conf.json exists in the project directory.
    * If it doesn't exist, create it with default values
@@ -711,6 +757,14 @@ export class McpServerManager {
         serverConfig.serverPath
       );
       defaultConfig.PYWINAUTO_CONFIG = pywinautoConfig;
+    }
+
+    // If this is a playwright-web server, add PLAYWRIGHT_CONFIG
+    if (serverConfig && serverConfig.serverType === "playwright-web") {
+      const playwrightConfig = await this.extractPlaywrightConfig(
+        serverConfig.serverPath
+      );
+      defaultConfig.PLAYWRIGHT_CONFIG = playwrightConfig;
     }
 
     try {
@@ -763,6 +817,8 @@ export class McpServerManager {
         return "pywinauto-mcp-server";
       case "appium-common":
         return "appium-mcp-server";
+      case "playwright-web":
+        return "playwright-mcp-server";
       default:
         console.warn(
           `Unknown server type: ${serverType}, using default pywinauto-mcp-server`
@@ -810,6 +866,18 @@ export class McpServerManager {
           appiumArgs.push("--config", confJsonPath);
         }
         return [...baseArgs, ...appiumArgs];
+
+      case "playwright-web":
+        // For Playwright web automation
+        const playwrightArgs = [
+          path.join(serverConfig.serverPath, "simple_server.py"),
+          "--transport",
+          "stdio",
+        ];
+        if (confJsonPath) {
+          playwrightArgs.push("--config", confJsonPath);
+        }
+        return [...baseArgs, ...playwrightArgs];
 
       default:
         // Fallback to basic configuration

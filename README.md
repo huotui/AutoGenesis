@@ -31,7 +31,7 @@ within the file for "TODO".
 
 > 📚 **[View Documentation Website](https://microsoft.github.io/AutoGenesis/)** | [中文文档](https://microsoft.github.io/AutoGenesis/)
 
-AutoGenesis is an AI-powered automated testing framework based on Model Context Protocol (MCP), supporting multiple platforms including desktop applications (Windows/macOS) and mobile applications (iOS/Android).
+AutoGenesis is an AI-powered automated testing framework based on Model Context Protocol (MCP), supporting multiple platforms including desktop applications (Windows/macOS), mobile applications (iOS/Android), and web applications.
 
 ## Platform-Specific Documentation
 
@@ -67,6 +67,16 @@ Please refer to the appropriate documentation based on your testing platform:
 **Get Started:**
 - See [MOBILE-README.md](MOBILE-README.md) for detailed setup instructions
 
+### 🌐 Web Testing (Chromium/Firefox/WebKit)
+
+**Features:**
+- Web browser automation
+- Multi-browser support (Chromium, Firefox, WebKit)
+- AI-assisted test script generation
+
+**Get Started:**
+- See [WEB-README.md](WEB-README.md) for detailed setup instructions
+
 ### 🧩 VS Code Extension (BDD AI Toolkit)
 
 **Features:**
@@ -83,6 +93,7 @@ Please refer to the appropriate documentation based on your testing platform:
 - [Windows Testing Setup](pywinauto-mcp-server/WINDOWS-README.md)
 - [macOS Testing Setup](MAC-README.md)
 - [Mobile Testing Setup](MOBILE-README.md)
+- [Web Testing Setup](WEB-README.md)
 - [License](LICENSE)
 
 ## Project Structure
@@ -90,6 +101,10 @@ Please refer to the appropriate documentation based on your testing platform:
     AutoGenesis/
     ├── appium-mcp-server/       # MCP server for mobile/mac automation
     │   ├── tools/               # Platform-specific driver tools
+    │   ├── llm/                 # LLM integration
+    │   └── utils/               # Utilities
+    ├── playwright-mcp-server/   # MCP server for web automation
+    │   ├── tools/               # Web-specific automation tools
     │   ├── llm/                 # LLM integration
     │   └── utils/               # Utilities
     ├── pywinauto-mcp-server/    # MCP server for Windows automation

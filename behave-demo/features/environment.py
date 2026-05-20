@@ -163,7 +163,20 @@ def take_screenshot(context, scenario_name):
         # Full path for the screenshot
         screenshot_path = screenshot_dir / filename
 
-        result = call_tool_sync(context, context.session.call_tool(name="take_screenshot", arguments={"save_path": str(screenshot_path)}))
+        # Check if Playwright MCP server is being used (has screenshot tool)
+        # Try Playwright screenshot tool first, fallback to pywinauto/appium
+        try:
+            result = call_tool_sync(context, context.session.call_tool(
+                name="screenshot", 
+                arguments={"file_path": str(screenshot_path)}
+            ))
+        except Exception:
+            # Fallback to legacy take_screenshot tool
+            result = call_tool_sync(context, context.session.call_tool(
+                name="take_screenshot", 
+                arguments={"save_path": str(screenshot_path)}
+            ))
+        
         status = get_tool_json(result).get('status')
         if status == "success":
             logger.info(f'Screenshot saved: {screenshot_path}')
@@ -220,13 +233,16 @@ def before_all(context):
     context.telemetry_client = telemetry_client 
     context._task_queue = janus.Queue()
     context._result_queue = janus.Queue()
-    session_ready = threading.Event()
+    
+    # Reset the global session_ready event
+    session_ready.clear()
 
     def run_loop():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
         async def mcp_worker():
+            global session_ready
             try:
                 mcp_config = load_mcp_config(server_name=AUTO_GENESIS_MCP_SERVER or None)
                 transport = mcp_config["transport"]
@@ -283,6 +299,8 @@ def before_all(context):
 
             except Exception as e:
                 print(f"MCP init failed: {repr(e)}")
+                import traceback
+                traceback.print_exc()
                 session_ready.set()
 
         loop.run_until_complete(mcp_worker())
@@ -290,7 +308,13 @@ def before_all(context):
     thread = threading.Thread(target=run_loop, daemon=True)
     thread.start()
 
-    session_ready.wait()
+    if not session_ready.wait(timeout=30):
+        raise TimeoutError("MCP server initialization timed out after 30 seconds")
+    
+    if not hasattr(context, 'session') or context.session is None:
+        raise RuntimeError("MCP server session was not initialized. Check mcp.json configuration.")
+    
+    print("MCP server session initialized successfully")
 
 
 

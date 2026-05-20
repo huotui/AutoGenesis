@@ -166,6 +166,11 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
           this.setupAppiumMcp(webviewView);
           return;
 
+        case "setupPlaywrightMcp":
+          console.log("Setting up Playwright MCP server");
+          this.setupPlaywrightMcp(webviewView);
+          return;
+
         case "openMcpSettings":
           console.log("Opening MCP Settings");
           this.openMcpSettings(webviewView);
@@ -759,6 +764,13 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
    */
   private async setupAppiumMcp(webviewView: vscode.WebviewView): Promise<void> {
     return this.setupMcpServer(webviewView, "appium-common", "Appium");
+  }
+
+  /**
+   * Setup Playwright MCP server with detailed progress feedback
+   */
+  private async setupPlaywrightMcp(webviewView: vscode.WebviewView): Promise<void> {
+    return this.setupMcpServer(webviewView, "playwright-web", "Playwright");
   } /**
    * Open MCP settings file in VS Code
    */

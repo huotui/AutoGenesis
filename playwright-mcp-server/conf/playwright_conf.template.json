@@ -1,0 +1,12 @@
+{
+  "browser": {
+    "browser_name": "chromium",
+    "headless": false,
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "timeout": 30000,
+    "slow_mo": 500
+  }
+}

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "playwright-mcp-server"
+version = "0.1.0"
+description = "Playwright MCP Server for web automation testing"
+authors = [
+    {name = "AutoGenesis Team"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "psutil",
+    "mcp>=1.23.0",
+    "playwright>=1.40.0",
+    "behave==1.2.6",
+    "janus>=0.6.0",
+    "langchain>=0.1.20",
+    "langchain-openai>=0.0.8",
+    "langchain-anthropic>=0.0.8",  
+    "langchain-google-genai>=0.0.8",
+    "google-generativeai>=0.4.0",
+    "anthropic>=0.22.0",
+    "openai>=1.0.0",
+    "pillow==11.1.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "applicationinsights",
+    "watchdog>=3.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["utils*", "tools*", "llm*"]
+exclude = ["logs*", "conf*"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=6.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=21.0.0",
+    "flake8>=3.8.0",
+    "mypy>=0.900",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

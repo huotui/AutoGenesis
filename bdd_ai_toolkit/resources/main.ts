@@ -840,7 +840,9 @@ window.addEventListener('load', function () {
     updateFigmaButtonState();    // MCP Server Management Button Event Listeners
     const setupWindowsMcpButton = document.getElementById('setupWindowsMcp') as HTMLButtonElement;
     const setupAppiumMcpWindowsButton = document.getElementById('setupAppiumMcpWindows') as HTMLButtonElement;
+    const setupPlaywrightMcpWindowsButton = document.getElementById('setupPlaywrightMcpWindows') as HTMLButtonElement;
     const setupAppiumMcpMacButton = document.getElementById('setupAppiumMcpMac') as HTMLButtonElement;
+    const setupPlaywrightMcpMacButton = document.getElementById('setupPlaywrightMcpMac') as HTMLButtonElement;
     const openMcpSettingsButton = document.getElementById('openMcpSettings') as HTMLButtonElement;
 
     // Windows - pywinauto MCP server setup
@@ -859,12 +861,28 @@ window.addEventListener('load', function () {
         addMcpButtonHoverEffects(setupAppiumMcpWindowsButton);
     }
 
+    // Windows - Playwright MCP server setup
+    if (setupPlaywrightMcpWindowsButton) {
+        setupPlaywrightMcpWindowsButton.addEventListener('click', function(this: HTMLButtonElement) {
+            handleMcpSetupClick(this, 'setupPlaywrightMcp', 'playwright');
+        });
+        addMcpButtonHoverEffects(setupPlaywrightMcpWindowsButton);
+    }
+
     // macOS - Appium MCP server setup
     if (setupAppiumMcpMacButton) {
         setupAppiumMcpMacButton.addEventListener('click', function(this: HTMLButtonElement) {
             handleMcpSetupClick(this, 'setupAppiumMcp', 'appium');
         });
         addMcpButtonHoverEffects(setupAppiumMcpMacButton);
+    }
+
+    // macOS - Playwright MCP server setup
+    if (setupPlaywrightMcpMacButton) {
+        setupPlaywrightMcpMacButton.addEventListener('click', function(this: HTMLButtonElement) {
+            handleMcpSetupClick(this, 'setupPlaywrightMcp', 'playwright');
+        });
+        addMcpButtonHoverEffects(setupPlaywrightMcpMacButton);
     }
 
     if (openMcpSettingsButton) {
@@ -1066,7 +1084,9 @@ function restoreSetupButton(): void {
     const setupButtons = [
         document.getElementById('setupWindowsMcp') as HTMLButtonElement,
         document.getElementById('setupAppiumMcpWindows') as HTMLButtonElement,
-        document.getElementById('setupAppiumMcpMac') as HTMLButtonElement
+        document.getElementById('setupAppiumMcpMac') as HTMLButtonElement,
+        document.getElementById('setupPlaywrightMcpWindows') as HTMLButtonElement,
+        document.getElementById('setupPlaywrightMcpMac') as HTMLButtonElement
     ];
 
     setupButtons.forEach(setupButton => {

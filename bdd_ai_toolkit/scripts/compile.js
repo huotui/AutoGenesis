@@ -292,6 +292,12 @@ function compile() {
                 targetDirName: 'appium-mcp-server',
                 projectName: 'bdd-appium-mcp-server',
                 description: 'MCP Server for Appium Automation - BDD AI Toolkit'
+            },
+            {
+                sourceDir: 'playwright-mcp-server',
+                targetDirName: 'playwright-mcp-server',
+                projectName: 'bdd-playwright-mcp-server',
+                description: 'MCP Server for Playwright Automation - BDD AI Toolkit'
             }
         ];
         

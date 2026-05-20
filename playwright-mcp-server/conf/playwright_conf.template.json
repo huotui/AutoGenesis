@@ -7,6 +7,10 @@
       "height": 720
     },
     "timeout": 30000,
-    "slow_mo": 500
+    "slow_mo": 500,
+    "extra_http_headers": {
+      "Authorization": "Bearer your-token-here",
+      "X-Custom-Header": "custom-value"
+    }
   }
 }

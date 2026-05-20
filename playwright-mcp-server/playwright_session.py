@@ -49,6 +49,7 @@ class PlaywrightSessionManager:
         browser_name = browser_config.get("browser_name", "chromium")
         headless = browser_config.get("headless", False)
         viewport = browser_config.get("viewport", {"width": 1280, "height": 720})
+        extra_http_headers = browser_config.get("extra_http_headers", None)
         
         self._playwright = await async_playwright().start()
         
@@ -62,8 +63,13 @@ class PlaywrightSessionManager:
         else:
             raise ValueError(f"Unsupported browser: {browser_name}")
         
-        # Create browser context
-        self._context = await self._browser.new_context(viewport=viewport)
+        # Create browser context with optional extra HTTP headers
+        context_options = {"viewport": viewport}
+        if extra_http_headers:
+            context_options["extra_http_headers"] = extra_http_headers
+            logger.info(f"Custom HTTP headers configured: {list(extra_http_headers.keys())}")
+        
+        self._context = await self._browser.new_context(**context_options)
         self._context.set_default_timeout(browser_config.get("timeout", 30000))
         
         # Create new page

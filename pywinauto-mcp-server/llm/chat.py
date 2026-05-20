@@ -25,6 +25,8 @@ DEFAULT_LOCAL_LM_ENDPOINT = "http://localhost:11434"
 # Environment variable names for configuration
 AZURE_OPENAI_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 AZURE_OPENAI_ENDPOINT_ENV = "AZURE_OPENAI_ENDPOINT"
+LOCAL_LM_ENDPOINT_ENV = "LOCAL_LM_ENDPOINT"
+LOCAL_LM_MODEL_NAME_ENV = "LOCAL_LM_MODEL_NAME"
 
 
 class LLMClient:
@@ -42,7 +44,8 @@ class LLMClient:
         self.timeout = DEFAULT_TIMEOUT
         self.api_key = os.getenv(AZURE_OPENAI_API_KEY_ENV)
         self.azure_endpoint = os.getenv(AZURE_OPENAI_ENDPOINT_ENV)
-        self.local_lm_endpoint = DEFAULT_LOCAL_LM_ENDPOINT
+        self.local_lm_endpoint = os.getenv(LOCAL_LM_ENDPOINT_ENV, DEFAULT_LOCAL_LM_ENDPOINT)
+        self.local_lm_model_name = os.getenv(LOCAL_LM_MODEL_NAME_ENV, "gpt-4o")
         # logging.info(f"LLMClient initialized with: {self.__dict__}")
 
     def get_azure_model(
@@ -170,7 +173,7 @@ class LLMClient:
         prompt = img_task_prompt(task_info)
         output_format = ImgTaskResponse.get_prompt_format()
         payload = {
-            "model": "gpt-4o",
+            "model": self.local_lm_model_name,
             "messages": [
                 {
                     "role": "user",
@@ -197,23 +200,28 @@ class LLMClient:
         return res
 
     def local_copilot_available(self) -> bool:
-        url_tag = f"{self.local_lm_endpoint}/api/tags"
+        """检查本地 OpenAI 兼容接口是否可用"""
+        # 尝试 OpenAI 兼容的 /v1/models 端点
         try:
-            response = requests.get(url_tag, timeout=10)
+            response = requests.get(f"{self.local_lm_endpoint}/v1/models", timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                models = data.get("models", [])
-                models = [model["name"] for model in models]
-                if "gpt-4o" in models:
+                # OpenAI 兼容接口返回格式
+                models_data = data.get("data", [])
+                model_ids = [model.get("id", "") for model in models_data]
+                
+                # 检查配置的模型是否存在
+                if self.local_lm_model_name in model_ids:
+                    logging.info(f"Model '{self.local_lm_model_name}' found in local LLM.")
                     return True
                 else:
-                    logging.warning("gpt-4o model not found in local copilot tags.")
+                    logging.warning(f"Model '{self.local_lm_model_name}' not found. Available models: {model_ids}")
                     return False
             else:
-                logging.error(f"Failed to check local copilot availability: {response.status_code} - {response.text}")
+                logging.error(f"Failed to check local LLM availability: {response.status_code} - {response.text}")
                 return False
         except Exception as e:
-            logging.error(f"Error checking local copilot availability: {repr(e)}")
+            logging.error(f"Error checking local LLM availability: {repr(e)}")
             return False
 
     def azure_gpt_available(self) -> bool:

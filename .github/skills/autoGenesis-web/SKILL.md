@@ -31,6 +31,44 @@ behave-demo/
 
 ## Workflow
 
+### Step 0: Initialize Project Structure (if needed)
+
+**CRITICAL**: Before proceeding, check if `behave-demo/` directory exists in the current working directory.
+
+**If `behave-demo/` does NOT exist:**
+
+1. Copy the entire `assets/behave-demo/` directory from the skill to the current working directory:
+   ```
+   assets/behave-demo/  →  behave-demo/
+   ```
+
+2. Verify the copied structure:
+   ```
+   behave-demo/
+   ├── features/
+   │   ├── *.feature           # Feature files
+   │   ├── environment.py      # Behave environment setup
+   │   └── steps/
+   │       ├── __init__.py
+   │       └── *_steps.py      # Step implementations
+   ├── pyproject.toml          # Project dependencies
+   └── uv.lock                 # Lock file
+   ```
+
+3. Install dependencies:
+   ```bash
+   cd behave-demo
+   uv sync
+   ```
+
+4. Confirm initialization:
+   ```
+   ✅ behave-demo project initialized from assets template
+   ```
+
+**If `behave-demo/` already exists:**
+- Skip this step and proceed to Step 1
+
 ### Step 1: Locate the Scenario
 
 Search `behave-demo/features/**/*.feature` (or the specified `feature_file`) for a `Scenario:` line matching `scenario_name`. Extract the full step block (Given/When/Then/And lines).

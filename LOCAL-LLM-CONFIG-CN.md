@@ -28,6 +28,9 @@ LOCAL_LM_ENDPOINT=http://localhost:11434
 
 # 本地 LLM 模型名称
 LOCAL_LM_MODEL_NAME=qwen2.5:7b
+
+# 本地 LLM API Key（可选，部分服务需要）
+LOCAL_LM_API_KEY=your-api-key
 ```
 
 ### 方法 2：直接设置环境变量
@@ -37,6 +40,7 @@ LOCAL_LM_MODEL_NAME=qwen2.5:7b
 ```powershell
 $env:LOCAL_LM_ENDPOINT = "http://localhost:11434"
 $env:LOCAL_LM_MODEL_NAME = "qwen2.5:7b"
+$env:LOCAL_LM_API_KEY = "your-api-key"
 ```
 
 **Linux/macOS:**
@@ -44,6 +48,7 @@ $env:LOCAL_LM_MODEL_NAME = "qwen2.5:7b"
 ```bash
 export LOCAL_LM_ENDPOINT=http://localhost:11434
 export LOCAL_LM_MODEL_NAME=qwen2.5:7b
+export LOCAL_LM_API_KEY=your-api-key
 ```
 
 ---

@@ -27,6 +27,7 @@ AZURE_OPENAI_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 AZURE_OPENAI_ENDPOINT_ENV = "AZURE_OPENAI_ENDPOINT"
 LOCAL_LM_ENDPOINT_ENV = "LOCAL_LM_ENDPOINT"
 LOCAL_LM_MODEL_NAME_ENV = "LOCAL_LM_MODEL_NAME"
+LOCAL_LM_API_KEY_ENV = "LOCAL_LM_API_KEY"
 
 
 class LLMClient:
@@ -46,6 +47,7 @@ class LLMClient:
         self.azure_endpoint = os.getenv(AZURE_OPENAI_ENDPOINT_ENV)
         self.local_lm_endpoint = os.getenv(LOCAL_LM_ENDPOINT_ENV, DEFAULT_LOCAL_LM_ENDPOINT)
         self.local_lm_model_name = os.getenv(LOCAL_LM_MODEL_NAME_ENV, "gpt-4o")
+        self.local_lm_api_key = os.getenv(LOCAL_LM_API_KEY_ENV)
         # logging.info(f"LLMClient initialized with: {self.__dict__}")
 
     def get_azure_model(
@@ -185,7 +187,10 @@ class LLMClient:
             ],
             "stream": False,
         }
-        response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, timeout=30)
+        headers = {}
+        if self.local_lm_api_key:
+            headers["Authorization"] = f"Bearer {self.local_lm_api_key}"
+        response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, headers=headers, timeout=30)
         if response.status_code != 200:
             raise Exception(f"Failed to get response from local LLM: {response.status_code} - {response.text}")
         data = response.json()

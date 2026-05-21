@@ -24,6 +24,7 @@ DEFAULT_LOCAL_LM_ENDPOINT = "http://localhost:11434"
 
 AZURE_OPENAI_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 AZURE_OPENAI_ENDPOINT_ENV = "AZURE_OPENAI_ENDPOINT"
+LOCAL_LM_API_KEY_ENV = "LOCAL_LM_API_KEY"
 
 
 class LLMClient:
@@ -42,6 +43,7 @@ class LLMClient:
         self.api_key = os.getenv(AZURE_OPENAI_API_KEY_ENV)
         self.azure_endpoint = os.getenv(AZURE_OPENAI_ENDPOINT_ENV)
         self.local_lm_endpoint = DEFAULT_LOCAL_LM_ENDPOINT
+        self.local_lm_api_key = os.getenv(LOCAL_LM_API_KEY_ENV)
 
     def get_azure_model(
         self,
@@ -195,7 +197,10 @@ class LLMClient:
             ],
             "stream": False,
         }
-        response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, timeout=30)
+        headers = {}
+        if self.local_lm_api_key:
+            headers["Authorization"] = f"Bearer {self.local_lm_api_key}"
+        response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, headers=headers, timeout=30)
         if response.status_code != 200:
             raise Exception(f"Failed to get response from local LLM: {response.status_code} - {response.text}")
         data = response.json()
@@ -294,7 +299,10 @@ class LLMClient:
             ],
             "stream": False,
         }
-        response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, timeout=30)
+        headers = {}
+        if self.local_lm_api_key:
+            headers["Authorization"] = f"Bearer {self.local_lm_api_key}"
+        response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, headers=headers, timeout=30)
         if response.status_code != 200:
             raise Exception(f"Failed to get response from local LLM: {response.status_code} - {response.text}")
         data = response.json()

@@ -222,9 +222,58 @@ Before running tests, ensure `playwright-mcp-server/conf/playwright_conf.json` i
 
 ## MCP Tools Available
 
-- **playwright_tool**: Browser navigation and element interaction (browser_navigate, click_element, send_keys, get_page_title, etc.)
-- **verify_tool**: Element and text verification (verify_element_exists, verify_text_on_page, verify_element_attribute, etc.)
-- **gen_code_tool**: Code generation (before_gen_code, preview_code_changes, confirm_code_changes)
+### Browser Navigation & Page Control
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `browser_navigate` | Navigate to URL | `url`, `caller` |
+| `browser_close` | Close browser | `caller` |
+| `screenshot` | Take full-page screenshot | `file_path`, `caller` |
+| `scroll_page` | Scroll page up or down | `direction`, `amount`, `caller` |
+| `scroll_to_element` | Scroll page to make element visible | `locator_value`, `locator_strategy`, `caller` |
+
+### Element Interaction
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `click_element` | Click an element | `locator_value`, `locator_strategy`, `caller` |
+| `hover_element` | Hover mouse over element (triggers dropdown menus) | `locator_value`, `locator_strategy`, `caller` |
+| `send_keys` | Enter text in form field | `locator_value`, `text`, `locator_strategy`, `caller` |
+| `press_key` | Press keyboard key | `key`, `caller` |
+| `select_option` | Select dropdown option | `locator_value`, `option_value`, `locator_strategy`, `caller` |
+| `execute_javascript` | Execute JS on page | `script`, `caller` |
+
+### Element Discovery
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `find_element` | Find element on page | `locator_value`, `locator_strategy`, `caller` |
+| `wait_for_element` | Wait for element to appear | `locator_value`, `locator_strategy`, `timeout`, `caller` |
+| `get_text` | Get text content from element | `locator_value`, `locator_strategy`, `caller` |
+| `get_page_title` | Get current page title | `caller` |
+| `get_page_url` | Get current page URL | `caller` |
+
+### Verification & Validation
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `verify_element_exists` | Verify element exists | `locator_value`, `locator_strategy`, `caller` |
+| `verify_element_not_exists` | Verify element does not exist | `locator_value`, `locator_strategy`, `caller` |
+| `verify_element_attribute` | Verify element attribute value | `locator_value`, `attribute_name`, `expected_value`, `rule`, `caller` |
+| `verify_text_on_page` | Verify text exists on page | `text`, `caller` |
+| `verify_checkbox_state` | Verify checkbox/radio state (checked/unchecked) | `locator_value`, `expected_state`, `locator_strategy`, `caller` |
+| `verify_element_value` | Verify form element value (input/textarea/select) | `locator_value`, `expected_value`, `locator_strategy`, `caller` |
+| `verify_visual_task` | AI-powered visual verification from screenshot | `screenshot_path`, `task_description`, `caller` |
+| `evaluate_web_visual_task` | AI-powered web page evaluation (screenshot + HTML) | `screenshot_path`, `task_description`, `caller` |
+
+### Code Generation
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `before_gen_code` | Initialize code generation session | `feature_file`, `step_file` |
+| `preview_code_changes` | Preview generated code changes | (none) |
+| `confirm_code_changes` | Confirm and save code changes | (none) |
+
+### Configuration
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_config` | Get current configuration | `caller` |
+| `update_config` | Update configuration | `config_key`, `config_value`, `caller` |
 
 ## Common Locator Strategies
 

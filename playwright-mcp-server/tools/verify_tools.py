@@ -8,6 +8,7 @@ from utils.response_format import format_tool_response, init_tool_response, hand
 from utils.gen_code import record_calls
 from tools.playwright_tool import get_playwright_locator
 from utils.logger import get_mcp_logger
+from llm.chat import LLMClient
 
 logger = get_mcp_logger()
 
@@ -51,6 +52,124 @@ def register_verify_tools(mcp, session_manager):
         if resp.get("status") != "error":
             page_source = await page.content()
             handle_page_source(resp, page_source, "", False)
+
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
+    async def verify_visual_task(
+        caller: str,
+        screenshot_path: str,
+        task_description: str,
+        scenario: str = "",
+        step_raw: str = "",
+        step: str = "",
+    ) -> str:
+        """
+        Read and analyze a screenshot, verify if the visual content matches the task description.
+
+        Combines screenshot reading and visual analysis to verify UI content automatically.
+        Ideal for visual verification in automated testing scenarios.
+
+        Args:
+            caller (str): Calling module/function identifier
+            screenshot_path (str): Path to the screenshot image file
+            task_description (str): Task to verify against the screenshot
+            scenario (str): Test scenario name
+            step_raw (str): Raw step text
+            step (str): Current step description
+
+        Returns:
+            str: JSON response with status, verification result, reason, and error (if any)
+
+        """
+        resp = init_tool_response()
+        try:
+            if not screenshot_path.lower().endswith(".png"):
+                raise ValueError("Only PNG format screenshots are supported.")
+            
+            with open(screenshot_path, "rb") as f:
+                image_data = f.read()
+
+            client = LLMClient()
+            result = client.evaluate_task(task_info=task_description, image_data=image_data)
+
+            resp["status"] = "success" if result.result else "error"
+            resp["data"] = {
+                "result": result.result,
+                "reason": result.reason,
+                "step_raw": step_raw,
+            }
+            if resp["status"] == "error":
+                resp["error"] = result.reason
+        except Exception as e:
+            resp["status"] = "error"
+            resp["error"] = repr(e)
+            logger.error(f"Error in verify_visual_task: {e}")
+
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
+    async def evaluate_web_visual_task(
+        caller: str,
+        screenshot_path: str,
+        task_description: str,
+        scenario: str = "",
+        step_raw: str = "",
+        step: str = "",
+    ) -> str:
+        """
+        Evaluate web page using both screenshot and page source with LLM.
+
+        Uses AI to analyze the current page state by combining visual screenshot and HTML source.
+        Ideal for complex UI verification that requires understanding both visual layout and DOM structure.
+
+        Args:
+            caller (str): Calling module/function identifier
+            screenshot_path (str): Path to the screenshot image file
+            task_description (str): Task description to evaluate
+            scenario (str): Test scenario name
+            step_raw (str): Raw step text
+            step (str): Current step description
+
+        Returns:
+            str: JSON response with status, evaluation result, reason, and found elements (if any)
+
+        """
+        resp = init_tool_response()
+        try:
+            if not screenshot_path.lower().endswith(".png"):
+                raise ValueError("Only PNG format screenshots are supported.")
+            
+            with open(screenshot_path, "rb") as f:
+                image_data = f.read()
+
+            page = session_manager.page
+            page_source = await page.content()
+
+            client = LLMClient()
+            result = client.evaluate_web_task(
+                task_info=task_description,
+                page_source=page_source,
+                image_data=image_data
+            )
+
+            resp["status"] = "success" if result.result else "error"
+            resp["data"] = {
+                "result": result.result,
+                "reason": result.reason,
+                "elements_found": result.elements_found if hasattr(result, 'elements_found') else [],
+                "step_raw": step_raw,
+            }
+            if resp["status"] == "error":
+                resp["error"] = result.reason
+        except Exception as e:
+            resp["status"] = "error"
+            resp["error"] = repr(e)
+            logger.error(f"Error in evaluate_web_visual_task: {e}")
 
         return json.dumps(format_tool_response(resp))
 

@@ -134,6 +134,143 @@ def register_playwright_tools(mcp, session_manager):
     @mcp.tool()
     @log_tool_call
     @record_calls(session_manager)
+    async def hover_element(
+        caller: str,
+        locator_value: str,
+        locator_strategy: str = "css",
+        step: str = "",
+        scenario: str = "",
+        step_raw: str = "",
+        page_source_file: str = "",
+        summary_only: bool = False,
+    ) -> str:
+        """Hover mouse over an element to trigger hover effects or dropdown menus
+
+        Args:
+            caller: caller name
+            locator_value: element locator value
+            locator_strategy: strategy of the locator (e.g., 'css', 'xpath', 'id', 'text', 'role')
+            step: step name
+            step_raw: raw original step text
+            scenario: scenario name
+            page_source_file: optional, save page source to this file path instead of embedding inline
+            summary_only: optional, if true return agent-friendly summary instead of full page source
+        """
+        resp = init_tool_response()
+        try:
+            page = session_manager.page
+            locator = get_playwright_locator(locator_strategy, locator_value)
+            
+            element = page.locator(locator)
+            await element.wait_for(state="visible", timeout=5000)
+            await element.hover()
+            resp["status"] = "success"
+        except Exception as e:
+            logger.error(f"Error hovering over element: {e}")
+            resp["status"] = "error"
+            resp["error"] = f"Element {locator_value} not found or not hoverable: {str(e)}"
+
+        if resp.get("status") == "success":
+            time.sleep(2)
+            page_source = await page.content()
+            handle_page_source(resp, page_source, page_source_file, summary_only)
+            
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
+    async def scroll_page(
+        caller: str,
+        direction: str = "down",
+        amount: int = 300,
+        step: str = "",
+        scenario: str = "",
+        step_raw: str = "",
+        page_source_file: str = "",
+        summary_only: bool = False,
+    ) -> str:
+        """Scroll the page up or down to view content outside the viewport
+
+        Args:
+            caller: caller name
+            direction: scroll direction, 'up' or 'down' (default: 'down')
+            amount: number of pixels to scroll (default: 300)
+            step: step name
+            step_raw: raw original step text
+            scenario: scenario name
+            page_source_file: optional, save page source to this file path instead of embedding inline
+            summary_only: optional, if true return agent-friendly summary instead of full page source
+        """
+        resp = init_tool_response()
+        try:
+            page = session_manager.page
+            scroll_amount = amount if direction == "down" else -amount
+            await page.evaluate(f"window.scrollBy(0, {scroll_amount})")
+            resp["status"] = "success"
+            resp["data"]["direction"] = direction
+            resp["data"]["amount"] = amount
+        except Exception as e:
+            logger.error(f"Error scrolling page: {e}")
+            resp["status"] = "error"
+            resp["error"] = str(e)
+
+        if resp.get("status") == "success":
+            time.sleep(1)
+            page_source = await page.content()
+            handle_page_source(resp, page_source, page_source_file, summary_only)
+            
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
+    async def scroll_to_element(
+        caller: str,
+        locator_value: str,
+        locator_strategy: str = "css",
+        step: str = "",
+        scenario: str = "",
+        step_raw: str = "",
+        page_source_file: str = "",
+        summary_only: bool = False,
+    ) -> str:
+        """Scroll the page to make a specific element visible in the viewport
+
+        Args:
+            caller: caller name
+            locator_value: element locator value
+            locator_strategy: strategy of the locator (e.g., 'css', 'xpath', 'id', 'text', 'role')
+            step: step name
+            step_raw: raw original step text
+            scenario: scenario name
+            page_source_file: optional, save page source to this file path instead of embedding inline
+            summary_only: optional, if true return agent-friendly summary instead of full page source
+        """
+        resp = init_tool_response()
+        try:
+            page = session_manager.page
+            locator = get_playwright_locator(locator_strategy, locator_value)
+            
+            element = page.locator(locator)
+            await element.wait_for(state="attached", timeout=5000)
+            await element.scroll_into_view_if_needed()
+            resp["status"] = "success"
+        except Exception as e:
+            logger.error(f"Error scrolling to element: {e}")
+            resp["status"] = "error"
+            resp["error"] = f"Element {locator_value} not found: {str(e)}"
+
+        if resp.get("status") == "success":
+            time.sleep(1)
+            page_source = await page.content()
+            handle_page_source(resp, page_source, page_source_file, summary_only)
+            
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
     async def click_element(
         caller: str,
         locator_value: str,

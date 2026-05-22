@@ -58,6 +58,117 @@ def register_verify_tools(mcp, session_manager):
     @mcp.tool()
     @log_tool_call
     @record_calls(session_manager)
+    async def verify_checkbox_state(
+        caller: str,
+        locator_value: str,
+        locator_strategy: str = "css",
+        expected_state: str = "checked",
+        step: str = "",
+        scenario: str = "",
+        step_raw: str = "",
+    ) -> str:
+        """check/verify if a checkbox or radio button is in the expected state (checked or unchecked)
+
+        Args:
+            caller: caller name
+            locator_value: required, element locator value
+            locator_strategy: strategy of the locator (e.g., 'css', 'xpath', 'id', 'text', 'role')
+            expected_state: expected state of the checkbox, 'checked' or 'unchecked' (default: 'checked')
+            step: required, step name
+            step_raw: required, raw original step text
+            scenario: required, scenario name
+        """
+        resp = init_tool_response()
+        try:
+            page = session_manager.page
+            locator = get_playwright_locator(locator_strategy, locator_value)
+            
+            element = page.locator(locator)
+            await element.wait_for(state="attached", timeout=5000)
+            
+            is_checked = await element.is_checked()
+            actual_state = "checked" if is_checked else "unchecked"
+            
+            if actual_state == expected_state.lower():
+                resp["status"] = "success"
+                resp["data"]["actual_state"] = actual_state
+            else:
+                resp["status"] = "error"
+                resp["error"] = f"Checkbox state mismatch. Expected: '{expected_state}', Actual: '{actual_state}'"
+                resp["data"]["actual_state"] = actual_state
+        except Exception as e:
+            resp["status"] = "error"
+            resp["error"] = f"Failed to verify checkbox state: {str(e)}"
+            logger.error(f"Error verifying checkbox state: {e}")
+            
+        if resp.get("status") != "error":
+            page_source = await page.content()
+            handle_page_source(resp, page_source, "", False)
+
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
+    async def verify_element_value(
+        caller: str,
+        locator_value: str,
+        locator_strategy: str = "css",
+        expected_value: str = "",
+        step: str = "",
+        scenario: str = "",
+        step_raw: str = "",
+    ) -> str:
+        """check/verify if a form element (input, textarea, select) has the expected value
+
+        Args:
+            caller: caller name
+            locator_value: required, element locator value
+            locator_strategy: strategy of the locator (e.g., 'css', 'xpath', 'id', 'text', 'role')
+            expected_value: required, expected value of the form element
+            step: required, step name
+            step_raw: required, raw original step text
+            scenario: required, scenario name
+        """
+        resp = init_tool_response()
+        try:
+            page = session_manager.page
+            locator = get_playwright_locator(locator_strategy, locator_value)
+            
+            element = page.locator(locator)
+            await element.wait_for(state="visible", timeout=5000)
+            
+            tag_name = await element.evaluate("el => el.tagName.toLowerCase()")
+            actual_value = ""
+            
+            if tag_name == "select":
+                actual_value = await element.evaluate("el => el.value")
+            elif tag_name in ["input", "textarea"]:
+                actual_value = await element.input_value()
+            else:
+                actual_value = await element.inner_text()
+            
+            if expected_value in actual_value:
+                resp["status"] = "success"
+                resp["data"]["actual_value"] = actual_value
+            else:
+                resp["status"] = "error"
+                resp["error"] = f"Element value mismatch. Expected to contain: '{expected_value}', Actual: '{actual_value}'"
+                resp["data"]["actual_value"] = actual_value
+        except Exception as e:
+            resp["status"] = "error"
+            resp["error"] = f"Failed to verify element value: {str(e)}"
+            logger.error(f"Error verifying element value: {e}")
+            
+        if resp.get("status") != "error":
+            page_source = await page.content()
+            handle_page_source(resp, page_source, "", False)
+
+        return json.dumps(format_tool_response(resp))
+
+    @mcp.tool()
+    @log_tool_call
+    @record_calls(session_manager)
     async def verify_visual_task(
         caller: str,
         screenshot_path: str,

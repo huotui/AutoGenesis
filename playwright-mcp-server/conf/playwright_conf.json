@@ -3,7 +3,7 @@
     "browser_name": "chromium",
     "headless": false,
     "viewport": {
-      "width": 1920,
+      "width": 1680,
       "height": 1080
     },
     "timeout": 30000,

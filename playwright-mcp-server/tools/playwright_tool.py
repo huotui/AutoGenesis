@@ -59,6 +59,10 @@ def register_playwright_tools(mcp, session_manager):
         """
         resp = init_tool_response()
         try:
+            if not await session_manager.is_browser_alive():
+                logger.info("Browser session is dead, reinitializing...")
+                await session_manager.reinitialize()
+            
             page = session_manager.page
             await page.goto(url, wait_until="networkidle")
             resp["status"] = "success"

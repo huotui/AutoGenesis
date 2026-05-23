@@ -140,6 +140,36 @@ class PlaywrightSessionManager:
         """Get browser context"""
         return self._context
     
+    async def is_browser_alive(self) -> bool:
+        """Check if browser session is still alive"""
+        try:
+            if self._page is None or self._browser is None or self._context is None:
+                return False
+            if not self._browser.is_connected():
+                return False
+            try:
+                await self._page.evaluate("1")
+                return True
+            except Exception:
+                return False
+        except Exception:
+            return False
+    
+    async def reinitialize(self):
+        """Reinitialize browser session if it has been closed"""
+        try:
+            await self.close_async()
+        except Exception as e:
+            logger.warning(f"Error closing old session during reinitialize: {e}")
+        
+        self._playwright = None
+        self._browser = None
+        self._context = None
+        self._page = None
+        
+        await self.initialize()
+        logger.info("Browser session reinitialized successfully")
+    
     def update_config(self, new_config: Dict[str, Any]):
         """Update configuration (requires restart for browser changes)"""
         logger.info("Configuration updated")
@@ -159,6 +189,11 @@ class PlaywrightSessionManager:
             logger.info("Browser session closed")
         except Exception as e:
             logger.error(f"Error closing browser session: {e}")
+        finally:
+            self._page = None
+            self._context = None
+            self._browser = None
+            self._playwright = None
     
     def close(self):
         """Close browser and cleanup (sync wrapper that schedules async cleanup)."""

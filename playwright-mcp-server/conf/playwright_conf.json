@@ -1,10 +1,10 @@
 {
   "browser": {
     "browser_name": "chromium",
-    "headless": true,
+    "headless": false,
     "viewport": {
-      "width": 1280,
-      "height": 720
+      "width": 1920,
+      "height": 1080
     },
     "timeout": 30000,
     "slow_mo": 500

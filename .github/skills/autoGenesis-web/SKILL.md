@@ -175,8 +175,10 @@ After `preview_code_changes` and `confirm_code_changes` are called, you MUST:
 
 2. **Copy files to the correct location**:
    - Read the generated code from the MCP server's location
-   - Create/update the file in: `behave-demo/features/steps/<scenario_name>_steps.py`
-   - Use a descriptive filename based on the scenario or feature name
+   - Create/update the file in: `behave-demo/features/steps/<feature_name>_steps.py`
+   - **IMPORTANT**: Use the descriptive filename based on the FEATURE name, NOT the scenario name**
+   - Example: If the feature file is `library_test.feature`, the steps file should be `library_test_steps.py`
+   - Example: If the feature file is `chiphell_test.feature`, the steps file should be `chiphell_test_steps.py`
 
 3. **Confirm the final location** to the user:
    ```

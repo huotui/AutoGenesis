@@ -284,6 +284,9 @@ The Playwright MCP server provides the following automation tools:
 - `get_text` - Get text content from element
 - `select_option` - Select option from dropdown
 - `press_key` - Press a keyboard key
+- `hover_element` - Hover mouse over element
+- `scroll_page` - Scroll page up or down
+- `scroll_to_element` - Scroll to make element visible
 
 ### Page Information
 - `get_page_title` - Get current page title
@@ -302,7 +305,38 @@ The Playwright MCP server provides the following automation tools:
 
 ## Advanced Configuration
 
-### Azure GPT Integration (Optional)
+### Local LLM Integration (Optional)
+
+#### Configure Local LLM (e.g., Ollama, LM Studio)
+
+Set environment variables for local LLM integration:
+
+    $env:LOCAL_LM_ENDPOINT = "http://localhost:11434"
+    $env:LOCAL_LM_MODEL_NAME = "qwen2.5:7b"
+    $env:LOCAL_LM_API_KEY = "your-api-key"  # Optional
+
+Or create a `.env` file in the project root:
+
+    LOCAL_LM_ENDPOINT=http://localhost:11434
+    LOCAL_LM_MODEL_NAME=qwen2.5:7b
+    LOCAL_LM_API_KEY=your-api-key
+
+**Configuration Options:**
+- `LOCAL_LM_ENDPOINT` - Local LLM service endpoint (default: http://localhost:11434)
+- `LOCAL_LM_MODEL_NAME` - Model ID/name to use (e.g., qwen2.5:7b, qwen2.5-vl:7b, llava:7b)
+- `LOCAL_LM_API_KEY` - API key for local LLM (optional, required by some services)
+
+**Supported Local LLM Services:**
+- **Ollama** (port 11434) - Most popular local LLM service
+- **LM Studio** (port 1234) - GUI-based, easy to use
+- **FastChat** (port 8000) - Supports multiple models
+- **vLLM** (port 8000) - High-performance inference service
+- **LocalAI** (port 8080) - Fully OpenAI API compatible
+
+**Recommended Models for Vision Tasks:**
+- `qwen2.5-vl:7b` - Supports Chinese and image analysis
+- `llava:7b` - Vision-language model
+- `qwen2.5:7b` - Good Chinese language support (text only)
 
 #### Configure Azure OpenAI
 
@@ -313,6 +347,8 @@ Set environment variables for Azure OpenAI integration:
     $env:AZURE_OPENAI_DEPLOYMENT = "your-deployment-name"
 
 Then configure Azure OpenAI credentials in `llm/chat.py` to enable screenshot analysis functionality.
+
+**Note:** The system automatically uses Azure OpenAI if configured, falling back to local LLM if Azure is unavailable.
 
 ### Headless Mode
 

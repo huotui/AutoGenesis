@@ -31,7 +31,9 @@ AutoGenesis Web 测试模块提供以下核心功能：
 - 🎯 **BDD 格式支持** - 自动生成行为驱动开发（BDD）格式的测试代码
 - 📸 **截图与分析** - 支持截图和 AI 截图分析功能
 - 🔍 **高级元素定位** - 支持 CSS、XPath 等多种定位策略
+- 🖱️ **丰富元素交互** - 支持点击、输入、悬停、滚动等操作
 - 🔄 **异步架构** - 基于 asyncio 的高性能异步操作
+- 🧠 **本地 LLM 支持** - 支持 Ollama、LM Studio 等本地大模型
 
 ---
 
@@ -445,8 +447,11 @@ Took 0m5.077s
 | `click_element` | 点击元素 | `locator_value`、`locator_strategy` |
 | `send_keys` | 在元素中输入文本 | `locator_value`、`text`、`locator_strategy` |
 | `get_text` | 获取元素文本内容 | `locator_value`、`locator_strategy` |
-| `select_option` | 选择下拉选项 | `locator_value`、`option`、`locator_strategy` |
+| `select_option` | 选择下拉选项 | `locator_value`、`option_value`、`locator_strategy` |
 | `press_key` | 按下键盘按键 | `key`（字符串） |
+| `hover_element` | 鼠标悬停在元素上 | `locator_value`、`locator_strategy` |
+| `scroll_page` | 滚动页面 | `direction`（up/down）、`amount`（像素） |
+| `scroll_to_element` | 滚动到元素位置 | `locator_value`、`locator_strategy` |
 
 ### 页面信息
 
@@ -573,7 +578,57 @@ click_element(locator_value="search-box", locator_strategy="id")
 
 ## 高级配置
 
-### Azure OpenAI 集成（可选）
+### 本地 LLM 集成（可选）
+
+#### 配置本地 LLM（如 Ollama、LM Studio）
+
+设置环境变量以集成本地 LLM：
+
+```powershell
+$env:LOCAL_LM_ENDPOINT = "http://localhost:11434"
+$env:LOCAL_LM_MODEL_NAME = "qwen2.5:7b"
+$env:LOCAL_LM_API_KEY = "your-api-key"  # 可选
+```
+
+或在项目根目录创建 `.env` 文件：
+
+```bash
+LOCAL_LM_ENDPOINT=http://localhost:11434
+LOCAL_LM_MODEL_NAME=qwen2.5:7b
+LOCAL_LM_API_KEY=your-api-key
+```
+
+**配置项说明：**
+- `LOCAL_LM_ENDPOINT` - 本地 LLM 服务端点地址（默认: http://localhost:11434）
+- `LOCAL_LM_MODEL_NAME` - 使用的模型 ID/名称（例如: qwen2.5:7b, qwen2.5-vl:7b, llava:7b）
+- `LOCAL_LM_API_KEY` - 本地 LLM API Key（可选，部分服务需要）
+
+**支持的本地 LLM 服务：**
+
+| 服务 | 默认端口 | 说明 |
+|------|----------|------|
+| **Ollama** | 11434 | 最流行的本地 LLM 服务 |
+| **LM Studio** | 1234 | 图形界面，易于使用 |
+| **FastChat** | 8000 | 支持多模型 |
+| **vLLM** | 8000 | 高性能推理服务 |
+| **LocalAI** | 8080 | 完全兼容 OpenAI API |
+
+**推荐用于视觉任务的模型：**
+- `qwen2.5-vl:7b` - 支持中文和图像分析
+- `llava:7b` - 视觉语言模型
+- `qwen2.5:7b` - 良好的中文支持（仅文本）
+
+**测试本地 LLM 连接：**
+
+```powershell
+# 在 playwright-mcp-server 目录下运行
+uv run python -c "
+from llm.chat import LLMClient
+client = LLMClient()
+print(f'端点: {client.local_lm_endpoint}')
+print(f'本地 LLM 可用: {client.local_copilot_available()}')
+"
+```
 
 #### 配置 Azure OpenAI
 
@@ -586,6 +641,8 @@ $env:AZURE_OPENAI_DEPLOYMENT = "your-deployment-name"
 ```
 
 然后在 `llm/chat.py` 中配置 Azure OpenAI 凭据以启用截图分析功能。
+
+**注意：** 系统会优先使用 Azure OpenAI（如果已配置），在 Azure 不可用时自动回退到本地 LLM。
 
 ### 无头模式
 

@@ -108,13 +108,54 @@ def register_gen_code_tools(mcp, session_manager):
             return json.dumps(format_tool_response(resp))
         
         try:
+            from utils.gen_code import extract_step_patterns, check_step_pattern_exists
+            from utils.gen_code import extract_steps_from_cache
+            
+            # 重新扫描现有步骤模式，确保最新状态
+            step_file = session_manager.steps_dir
+            existing_patterns = extract_step_patterns(step_file)
+            
+            # 从缓存中提取步骤并检查冲突
+            steps = extract_steps_from_cache(session_manager.gen_code_id, session_manager.gen_code_cache)
+            
+            # 检查是否有步骤会冲突
+            conflict_steps = []
+            for item in steps:
+                step_text = item.get('step_text', '')
+                step_type = item.get('step_type', '')
+                if check_step_pattern_exists(step_type, step_text, existing_patterns):
+                    conflict_steps.append(f"{step_type}('{step_text}')")
+            
+            if conflict_steps:
+                logger.warning(f"Potential conflicts detected: {conflict_steps}")
+            
+            # 读取现有文件内容
             existing_content = ""
             step_file_path = Path(session_manager.step_file_target)
             if step_file_path.exists():
                 existing_content = step_file_path.read_text(encoding='utf-8')
             
-            new_steps_to_write = [item for item in session_manager.proposed_changes if item.strip() and item.strip() not in existing_content]
+            # 使用精确的步骤代码去重
+            new_steps_to_write = []
+            for item in session_manager.proposed_changes:
+                if not item.strip():
+                    continue
+                    
+                # 提取步骤装饰器模式进行精确匹配
+                import re
+                step_patterns = re.findall(r'@(given|when|then|step)\s*\(\s*["\'](.+?)["\']\s*\)', item)
+                
+                is_duplicate = False
+                for pattern_type, pattern_text in step_patterns:
+                    if check_step_pattern_exists(pattern_type, pattern_text, existing_patterns):
+                        is_duplicate = True
+                        logger.info(f"Skipping duplicate step: {pattern_type}('{pattern_text}')")
+                        break
+                
+                if not is_duplicate:
+                    new_steps_to_write.append(item)
             
+            # 写入文件
             with open(session_manager.step_file_target, 'w', encoding='utf-8') as f:
                 f.write(existing_content)
                 if hasattr(session_manager, 'header_code') and session_manager.header_code:
@@ -124,7 +165,10 @@ def register_gen_code_tools(mcp, session_manager):
                     f.write(item + "\n")
             
             result = f"Applied {len(new_steps_to_write)} new steps to {session_manager.step_file_target}"
-            session_manager.new_steps_count = len(session_manager.proposed_changes)
+            if conflict_steps:
+                result += f" ({len(conflict_steps)} conflicts skipped)"
+            
+            session_manager.new_steps_count = len(new_steps_to_write)
             resp["status"] = "success"
             resp["data"] = {"message": result, "new_steps_count": session_manager.new_steps_count}
         except Exception as e:

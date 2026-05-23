@@ -183,7 +183,13 @@ After `preview_code_changes` and `confirm_code_changes` are called, you MUST:
    ✅ Step file saved to: behave-demo/features/steps/web_steps.py
    ```
 
-4. **Provide run instructions**:
+4. **Conflict Prevention - CRITICAL**:
+   - The MCP server now automatically detects duplicate step definitions
+   - If a step pattern already exists in any `*_steps.py` file under `behave-demo/features/steps/`, it will be skipped
+   - The server will report: `"Applied X new steps to path (Y conflicts skipped)"`
+   - **IMPORTANT**: Always verify the final step file location matches `behave-demo/features/steps/` NOT `playwright-mcp-server/behave_demo/features/steps/`
+
+5. **Provide run instructions**:
 
 ```bash
 cd behave-demo

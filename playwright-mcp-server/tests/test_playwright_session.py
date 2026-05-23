@@ -21,18 +21,24 @@ class TestPlaywrightSessionManager:
     def mock_playwright(self):
         with patch('playwright_session.async_playwright') as mock_pw:
             mock_pw_instance = MagicMock()
-            mock_pw.return_value.start = MagicMock(return_value=asyncio.coroutine(lambda: mock_pw_instance)())
             mock_browser = MagicMock()
-            mock_pw_instance.chromium.launch = MagicMock(return_value=asyncio.coroutine(lambda: mock_browser)())
-            mock_pw_instance.firefox.launch = MagicMock(return_value=asyncio.coroutine(lambda: mock_browser)())
-            mock_pw_instance.webkit.launch = MagicMock(return_value=asyncio.coroutine(lambda: mock_browser)())
             mock_context = MagicMock()
-            mock_browser.new_context = MagicMock(return_value=asyncio.coroutine(lambda: mock_context)())
             mock_page = MagicMock()
-            mock_context.new_page = MagicMock(return_value=asyncio.coroutine(lambda: mock_page)())
             
+            async def mock_launch(*args, **kwargs):
+                return mock_browser
+            async def mock_new_context(*args, **kwargs):
+                return mock_context
+            async def mock_new_page(*args, **kwargs):
+                return mock_page
             async def mock_start():
                 return mock_pw_instance
+            
+            mock_pw_instance.chromium.launch = mock_launch
+            mock_pw_instance.firefox.launch = mock_launch
+            mock_pw_instance.webkit.launch = mock_launch
+            mock_browser.new_context = mock_new_context
+            mock_context.new_page = mock_new_page
             mock_pw.return_value.start = mock_start
             
             yield {

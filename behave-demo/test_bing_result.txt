@@ -1,0 +1,56 @@
+=== STDOUT ===
+Package loaded from environment: com.microsoft.emmx.canary
+Found MCP config: D:\workspace\trae\AutoGenesis\behave-demo\.vscode\mcp.json
+Auto-discovered MCP server 'auto-genesis-playwright' (stdio) from mcp.json
+Using stdio transport for MCP server
+Loading MCP server with command: uv
+Args: ['run', '--project', 'd:\\workspace\\trae\\AutoGenesis\\playwright-mcp-server', 'python', 'd:\\workspace\\trae\\AutoGenesis\\playwright-mcp-server\\simple_server.py', '--transport', 'stdio']
+MCP server session initialized successfully
+Feature: Bing Website Test # features/web_test.feature:1
+
+  Scenario: Open bing.com successfully       # features/web_test.feature:3
+    Given I navigate to https://www.bing.com # None
+Error getting tool JSON: Expecting value: line 1 column 1 (char 0)
+AUTO-RETRY SCENARIO (attempt 1)
+    Then the page should load successfully   # None
+    And I should see the Bing search box     # None
+
+  Scenario: Open bing.com successfully       # features/web_test.feature:3
+    Given I navigate to https://www.bing.com # None
+Error getting tool JSON: Expecting value: line 1 column 1 (char 0)
+AUTO-RETRY SCENARIO FAILED (after 2 attempts)
+    Then the page should load successfully   # None
+    And I should see the Bing search box     # None
+
+
+Failing scenarios:
+  features/web_test.feature:3  Open bing.com successfully
+
+0 features passed, 1 failed, 0 skipped
+0 scenarios passed, 1 failed, 0 skipped
+0 steps passed, 0 failed, 1 skipped, 2 undefined
+Took 0m0.000s
+
+=== STDERR ===
+warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+warning: The `tool.uv.dev-dependencies` field (used in `d:\workspace\trae\AutoGenesis\playwright-mcp-server\pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+warning: `VIRTUAL_ENV=.venv` does not match the project environment path `d:\workspace\trae\AutoGenesis\playwright-mcp-server\.venv` and will be ignored; use `--active` to target the active environment instead
+2026-05-23 20:28:56,334 - utils.config_manager - INFO - Loading configuration from: d:\workspace\trae\AutoGenesis\playwright-mcp-server\conf\playwright_conf.json
+2026-05-23 20:28:56,339 - utils.config_manager - INFO - Configuration loaded successfully.
+2026-05-23 20:28:58,402 - playwright_session - INFO - Browser launched: chromium (headless=True)
+2026-05-23 20:28:58,407 - utils.config_manager - INFO - Started watching config file: d:\workspace\trae\AutoGenesis\playwright-mcp-server\conf\playwright_conf.json
+2026-05-23 20:28:58,408 - __main__ - INFO - Config file hot-reload enabled
+
+You can implement step definitions for undefined steps with these snippets:
+
+@given(u'I navigate to https://www.bing.com')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Given I navigate to https://www.bing.com')
+
+
+@then(u'the page should load successfully')
+def step_impl(context):
+    raise NotImplementedError(u'STEP: Then the page should load successfully')
+
+
+=== Return Code: 1 ===

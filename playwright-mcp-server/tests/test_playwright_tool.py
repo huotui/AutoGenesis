@@ -168,11 +168,11 @@ class TestPlaywrightTools:
         result = await tools['browser_close'](caller="test")
         response = json.loads(result)
         assert response["status"] == "success"
-        mock_session_manager.close.assert_called_once()
+        mock_session_manager.close_async.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_browser_close_error(self, tools, mock_session_manager):
-        mock_session_manager.close.side_effect = Exception("Close failed")
+        mock_session_manager.close_async = AsyncMock(side_effect=Exception("Close failed"))
         result = await tools['browser_close'](caller="test")
         response = json.loads(result)
         assert response["status"] == "error"
@@ -180,9 +180,10 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_find_element_success(self, tools, mock_session_manager):
         mock_element = MagicMock()
-        mock_element.count.return_value = 1
+        mock_element.wait_for = AsyncMock()
+        mock_element.count = AsyncMock(return_value=1)
         mock_session_manager.page.locator.return_value = mock_element
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['find_element'](
             caller="test",
@@ -195,7 +196,7 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_find_element_not_found(self, tools, mock_session_manager):
         mock_element = MagicMock()
-        mock_element.wait_for.side_effect = Exception("Element not visible")
+        mock_element.wait_for = AsyncMock(side_effect=Exception("Element not visible"))
         mock_session_manager.page.locator.return_value = mock_element
         
         result = await tools['find_element'](
@@ -209,8 +210,10 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_click_element_success(self, tools, mock_session_manager):
         mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
+        mock_element.click = AsyncMock()
         mock_session_manager.page.locator.return_value = mock_element
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['click_element'](
             caller="test",
@@ -219,12 +222,12 @@ class TestPlaywrightTools:
         )
         response = json.loads(result)
         assert response["status"] == "success"
-        mock_element.click.assert_called_once()
+        mock_element.click.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_click_element_error(self, tools, mock_session_manager):
         mock_element = MagicMock()
-        mock_element.wait_for.side_effect = Exception("Not visible")
+        mock_element.wait_for = AsyncMock(side_effect=Exception("Not visible"))
         mock_session_manager.page.locator.return_value = mock_element
         
         result = await tools['click_element'](
@@ -238,8 +241,10 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_send_keys_success(self, tools, mock_session_manager):
         mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
+        mock_element.fill = AsyncMock()
         mock_session_manager.page.locator.return_value = mock_element
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['send_keys'](
             caller="test",
@@ -249,12 +254,12 @@ class TestPlaywrightTools:
         )
         response = json.loads(result)
         assert response["status"] == "success"
-        mock_element.fill.assert_called_once_with("hello world")
+        mock_element.fill.assert_awaited_once_with("hello world")
 
     @pytest.mark.asyncio
     async def test_send_keys_error(self, tools, mock_session_manager):
         mock_element = MagicMock()
-        mock_element.wait_for.side_effect = Exception("Not found")
+        mock_element.wait_for = AsyncMock(side_effect=Exception("Not found"))
         mock_session_manager.page.locator.return_value = mock_element
         
         result = await tools['send_keys'](
@@ -269,9 +274,10 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_get_text_success(self, tools, mock_session_manager):
         mock_element = MagicMock()
-        mock_element.inner_text.return_value = "Hello World"
+        mock_element.wait_for = AsyncMock()
+        mock_element.inner_text = AsyncMock(return_value="Hello World")
         mock_session_manager.page.locator.return_value = mock_element
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['get_text'](
             caller="test",
@@ -295,7 +301,7 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_get_page_url_success(self, tools, mock_session_manager):
         mock_session_manager.page.url = "https://example.com/page"
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['get_page_url'](caller="test")
         response = json.loads(result)
@@ -305,8 +311,9 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_wait_for_element_success(self, tools, mock_session_manager):
         mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
         mock_session_manager.page.locator.return_value = mock_element
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['wait_for_element'](
             caller="test",
@@ -316,12 +323,12 @@ class TestPlaywrightTools:
         )
         response = json.loads(result)
         assert response["status"] == "success"
-        mock_element.wait_for.assert_called_once_with(state="visible", timeout=10000)
+        mock_element.wait_for.assert_awaited_once_with(state="visible", timeout=10000)
 
     @pytest.mark.asyncio
     async def test_wait_for_element_timeout(self, tools, mock_session_manager):
         mock_element = MagicMock()
-        mock_element.wait_for.side_effect = Exception("Timeout")
+        mock_element.wait_for = AsyncMock(side_effect=Exception("Timeout"))
         mock_session_manager.page.locator.return_value = mock_element
         
         result = await tools['wait_for_element'](
@@ -335,8 +342,10 @@ class TestPlaywrightTools:
     @pytest.mark.asyncio
     async def test_select_option_success(self, tools, mock_session_manager):
         mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
+        mock_element.select_option = AsyncMock()
         mock_session_manager.page.locator.return_value = mock_element
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['select_option'](
             caller="test",
@@ -345,11 +354,11 @@ class TestPlaywrightTools:
         )
         response = json.loads(result)
         assert response["status"] == "success"
-        mock_element.select_option.assert_called_once_with("option1")
+        mock_element.select_option.assert_awaited_once_with("option1")
 
     @pytest.mark.asyncio
     async def test_press_key_success(self, tools, mock_session_manager):
-        mock_session_manager.page.content.return_value = "<html></html>"
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
         
         result = await tools['press_key'](
             caller="test",
@@ -357,7 +366,7 @@ class TestPlaywrightTools:
         )
         response = json.loads(result)
         assert response["status"] == "success"
-        mock_session_manager.page.keyboard.press.assert_called_once_with("Enter")
+        mock_session_manager.page.keyboard.press.assert_awaited_once_with("Enter")
 
     @pytest.mark.asyncio
     async def test_screenshot_success(self, tools, mock_session_manager):
@@ -368,7 +377,7 @@ class TestPlaywrightTools:
         response = json.loads(result)
         assert response["status"] == "success"
         assert response["data"]["screenshot_path"] == "/tmp/screenshot.png"
-        mock_session_manager.page.screenshot.assert_called_once_with(
+        mock_session_manager.page.screenshot.assert_awaited_once_with(
             path="/tmp/screenshot.png", full_page=True
         )
 

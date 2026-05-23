@@ -247,8 +247,6 @@ def extract_step_patterns(step_path):
     
     if step_path.is_dir():
         py_files = list(step_path.rglob("*.py"))  
-    # elif step_path.is_file() and step_path.suffix == '.py':
-    #     py_files = [step_path]
     else:
         logger.warning(f"Invalid step path: {step_path}")
         return patterns
@@ -260,12 +258,14 @@ def extract_step_patterns(step_path):
         logger.info(f"Reading step file: {py_file}")
         try:
             with open(py_file, 'r', encoding='utf-8') as f:
-                for line_num, line in enumerate(f, 1):
-                    line = line.strip()
-                    if line.startswith('@') and any(decorator in line for decorator in ['given', 'when', 'then', 'step']):
-                        matches = re.findall(r'@(given|when|then|step)\(["\'](.+?)["\']\)', line)
-                        for decorator, pattern in matches:
-                            patterns.append((decorator.lower(), pattern.lower()))
+                content = f.read()
+                # 使用正则表达式提取所有步骤定义模式
+                # 匹配 @given('...'), @when('...'), @then('...'), @step('...')
+                pattern_regex = r'@(given|when|then|step)\s*\(\s*["\'](.+?)["\']\s*\)'
+                matches = re.findall(pattern_regex, content)
+                for decorator, pattern in matches:
+                    # 存储时转换为小写进行匹配
+                    patterns.append((decorator.lower(), pattern.lower()))
         except Exception as e:
             logger.error(f"Error reading file {py_file}: {repr(e)}")
         
@@ -273,6 +273,12 @@ def extract_step_patterns(step_path):
     
     logger.info(f"Extracted {len(patterns)} step patterns")
     return patterns
+
+
+def check_step_pattern_exists(pattern_type, pattern_text, existing_patterns):
+    """检查步骤模式是否已存在"""
+    pattern_lower = pattern_text.lower()
+    return (pattern_type.lower(), pattern_lower) in existing_patterns
 
 
 def gen_code_preview(browser_manager) -> dict:
@@ -302,13 +308,22 @@ def gen_code_preview(browser_manager) -> dict:
         logger.debug(f"Header set to: {browser_manager.header_code}")
 
     new_add_patterns = ()
+    skipped_count = 0
+    conflict_details = []
+    
     for item, step_code in processed_steps:
         step_text = item.get('step_text', '')
         step_type = item.get('step_type', '')
         
-        if (step_type, step_text.lower()) in existing_patterns:
+        # 使用精确的模式匹配检查
+        if check_step_pattern_exists(step_type, step_text, existing_patterns):
+            skipped_count += 1
+            conflict_details.append(f"Step already exists: {step_type}('{step_text}')")
             continue
-        if (step_type, step_text.lower()) in new_add_patterns and item.get("call_idx", 0) <= 1:
+            
+        if check_step_pattern_exists(step_type, step_text, new_add_patterns) and item.get("call_idx", 0) <= 1:
+            skipped_count += 1
+            conflict_details.append(f"Duplicate step in batch: {step_type}('{step_text}')")
             continue
             
         if step_code:
@@ -319,12 +334,15 @@ def gen_code_preview(browser_manager) -> dict:
     browser_manager.new_steps_count = len(new_steps_code)
     
     if not new_steps_code:
-        return {'diff_preview': "No new code changes to apply - all steps already exist", 'new_steps_code': []}
+        msg = f"No new code changes to apply - all {skipped_count} steps already exist"
+        if conflict_details:
+            msg += f"\n\nSkipped details:\n" + "\n".join(conflict_details[:10])
+        return {'diff_preview': msg, 'new_steps_code': []}
     
     max_show_size = 5
     new_steps_code_show = new_steps_code[:max_show_size]
 
-    diff_preview = "+++ New Code to Add +++\n"
+    diff_preview = f"+++ New Code to Add ({len(new_steps_code)} new steps, {skipped_count} skipped) +++\n"
     diff_preview += "".join(new_steps_code_show)
     if len(new_steps_code) > max_show_size:
         diff_preview += f"\n... and {len(new_steps_code) - max_show_size} more steps\n"

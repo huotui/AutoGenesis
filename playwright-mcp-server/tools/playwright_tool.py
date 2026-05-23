@@ -4,11 +4,12 @@
 from typing import Optional
 from playwright.async_api import Page
 import json
-import time
 import logging
 from utils.logger import log_tool_call, get_mcp_logger
+from playwright_session import smart_wait
 from utils.response_format import format_tool_response, init_tool_response, handle_page_source
 from utils.gen_code import record_calls
+from utils.retry import retry_async
 
 logger = get_mcp_logger()
 
@@ -37,6 +38,7 @@ def register_playwright_tools(mcp, session_manager):
     @mcp.tool()
     @log_tool_call
     @record_calls(session_manager)
+    @retry_async(max_retries=2, base_delay=1.0)
     async def browser_navigate(
         caller: str,
         url: str,
@@ -61,8 +63,9 @@ def register_playwright_tools(mcp, session_manager):
             await page.goto(url, wait_until="networkidle")
             resp["status"] = "success"
             
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
         except Exception as e:
             resp["error"] = repr(e)
             logger.error(f"Error navigating to URL: {e}")
@@ -126,8 +129,10 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found: {str(e)}"
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            await smart_wait(page, expected_delay=1.0, max_wait=3.0)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -171,9 +176,10 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found or not hoverable: {str(e)}"
 
         if resp.get("status") == "success":
-            time.sleep(2)
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            await smart_wait(page, expected_delay=1.0)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
             
         return json.dumps(format_tool_response(resp))
 
@@ -216,9 +222,10 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = str(e)
 
         if resp.get("status") == "success":
-            time.sleep(1)
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            await smart_wait(page, expected_delay=0.5)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
             
         return json.dumps(format_tool_response(resp))
 
@@ -262,9 +269,10 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found: {str(e)}"
 
         if resp.get("status") == "success":
-            time.sleep(1)
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            await smart_wait(page, expected_delay=0.5)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
             
         return json.dumps(format_tool_response(resp))
 
@@ -307,9 +315,10 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found or not clickable: {str(e)}"
 
         if resp.get("status") == "success":
-            time.sleep(2)
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            await smart_wait(page, expected_delay=1.0, max_wait=3.0)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
             
         return json.dumps(format_tool_response(resp))
 
@@ -357,8 +366,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found or not editable: {str(e)}"
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -404,8 +414,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found: {str(e)}"
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -443,8 +454,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = str(e)
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -482,8 +494,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = str(e)
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -529,8 +542,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Element {locator_value} not found within timeout: {str(e)}"
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -577,8 +591,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = f"Failed to select option: {str(e)}"
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -617,8 +632,9 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = str(e)
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))
 
@@ -691,7 +707,8 @@ def register_playwright_tools(mcp, session_manager):
             resp["error"] = str(e)
             
         if resp.get("status") != "error":
-            page_source = await page.content()
-            handle_page_source(resp, page_source, page_source_file, summary_only)
+            if session_manager.should_fetch_page_source():
+                page_source = await page.content()
+                handle_page_source(resp, page_source, page_source_file, summary_only)
 
         return json.dumps(format_tool_response(resp))

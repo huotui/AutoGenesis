@@ -108,13 +108,22 @@ def register_gen_code_tools(mcp, session_manager):
             return json.dumps(format_tool_response(resp))
         
         try:
-            with open(session_manager.step_file_target, 'a', encoding='utf-8') as f:
+            existing_content = ""
+            step_file_path = Path(session_manager.step_file_target)
+            if step_file_path.exists():
+                existing_content = step_file_path.read_text(encoding='utf-8')
+            
+            new_steps_to_write = [item for item in session_manager.proposed_changes if item.strip() and item.strip() not in existing_content]
+            
+            with open(session_manager.step_file_target, 'w', encoding='utf-8') as f:
+                f.write(existing_content)
                 if hasattr(session_manager, 'header_code') and session_manager.header_code:
-                    f.write(session_manager.header_code + "\n")
-                for item in session_manager.proposed_changes:
+                    if not existing_content:
+                        f.write(session_manager.header_code + "\n")
+                for item in new_steps_to_write:
                     f.write(item + "\n")
             
-            result = f"Applied {len(session_manager.proposed_changes)} new steps to {session_manager.step_file_target}"
+            result = f"Applied {len(new_steps_to_write)} new steps to {session_manager.step_file_target}"
             session_manager.new_steps_count = len(session_manager.proposed_changes)
             resp["status"] = "success"
             resp["data"] = {"message": result, "new_steps_count": session_manager.new_steps_count}

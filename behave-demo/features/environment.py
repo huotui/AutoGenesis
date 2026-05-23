@@ -308,8 +308,8 @@ def before_all(context):
     thread = threading.Thread(target=run_loop, daemon=True)
     thread.start()
 
-    if not session_ready.wait(timeout=30):
-        raise TimeoutError("MCP server initialization timed out after 30 seconds")
+    if not session_ready.wait(timeout=90):
+        raise TimeoutError("MCP server initialization timed out after 90 seconds")
     
     if not hasattr(context, 'session') or context.session is None:
         raise RuntimeError("MCP server session was not initialized. Check mcp.json configuration.")

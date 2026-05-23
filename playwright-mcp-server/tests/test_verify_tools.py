@@ -5,7 +5,7 @@ import pytest
 import json
 import os
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -20,9 +20,24 @@ class TestVerifyTools:
     def mock_session_manager(self):
         manager = MagicMock()
         mock_page = MagicMock()
+        mock_page.content = AsyncMock(return_value="<html><body>Test</body></html>")
+        mock_page.get_by_text = MagicMock()
+        mock_page.get_by_text.return_value.first.wait_for = AsyncMock()
+        
+        mock_locator = MagicMock()
+        mock_locator.wait_for = AsyncMock()
+        mock_locator.count = AsyncMock(return_value=1)
+        mock_locator.inner_text = AsyncMock(return_value="text")
+        mock_locator.input_value = AsyncMock(return_value="value")
+        mock_locator.evaluate = AsyncMock(return_value="input")
+        mock_locator.is_checked = AsyncMock(return_value=True)
+        mock_locator.get_attribute = AsyncMock(return_value="active")
+        mock_page.locator = MagicMock(return_value=mock_locator)
+        
         manager.page = mock_page
         manager.gen_code_cache = []
         manager.gen_code_id = None
+        manager.should_fetch_page_source = MagicMock(return_value=True)
         return manager
 
     @pytest.fixture

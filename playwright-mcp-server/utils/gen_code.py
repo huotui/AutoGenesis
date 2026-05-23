@@ -123,7 +123,7 @@ def generate_args_data_multi_param(step_info: dict):
     if is_package_replaced and package_value:
         tool_params = modified_params
         step_info['need_package_import'] = True
-        print(f"Debug: Package replaced for {tool_name}, setting need_package_import=True")  # 调试信息
+        logger.debug(f"Package replaced for {tool_name}, setting need_package_import=True")
 
     if not need_parameterize(step_info, len(parameterized_args)) and not is_package_replaced:
         args_str = pprint.pformat(tool_params, indent=0)
@@ -295,12 +295,11 @@ def gen_code_preview(browser_manager) -> dict:
 
     # 检查是否有任何步骤需要导入 package
     need_package_import = any(item.get('need_package_import', False) for item, _ in processed_steps)
-    print(f"Debug: need_package_import = {need_package_import}")  # 调试信息
+    logger.debug(f"need_package_import = {need_package_import}")
     
-    # 根据是否需要 package 设置 header
     if not step_file_target_path.exists() or os.path.getsize(step_file_target_path) == 0:
         browser_manager.header_code = get_header_auto_gen(need_package_import)
-        print(f"Debug: Header set to: {browser_manager.header_code}")  # 调试信息
+        logger.debug(f"Header set to: {browser_manager.header_code}")
 
     new_add_patterns = ()
     for item, step_code in processed_steps:
@@ -489,7 +488,6 @@ def record_calls(browser_manager):
                        json_result = json.loads(json_result)
                 else:
                     json_result = result
-                print(f"\n type of result: {type(result)}, type of json_result: {type(json_result)}\n")
 
                 if json_result.get("status") != "success":
                     return result  

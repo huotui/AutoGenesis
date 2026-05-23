@@ -85,10 +85,38 @@ class TestPlaywrightTools:
     def mock_session_manager(self):
         manager = MagicMock()
         mock_page = MagicMock()
+        mock_page.goto = AsyncMock()
+        mock_page.content = AsyncMock(return_value="<html><body>Test</body></html>")
+        mock_page.title = AsyncMock(return_value="Test Page")
+        mock_page.url = "https://example.com"
+        mock_page.keyboard = MagicMock()
+        mock_page.keyboard.press = AsyncMock()
+        mock_page.screenshot = AsyncMock()
+        mock_page.evaluate = AsyncMock()
+        mock_page.wait_for_load_state = AsyncMock()
+        mock_page.get_by_text = MagicMock()
+        
+        mock_locator = MagicMock()
+        mock_locator.wait_for = AsyncMock()
+        mock_locator.count = AsyncMock(return_value=1)
+        mock_locator.click = AsyncMock()
+        mock_locator.hover = AsyncMock()
+        mock_locator.fill = AsyncMock()
+        mock_locator.inner_text = AsyncMock(return_value="Some text")
+        mock_locator.input_value = AsyncMock(return_value="input value")
+        mock_locator.scroll_into_view_if_needed = AsyncMock()
+        mock_locator.select_option = AsyncMock()
+        mock_locator.get_attribute = AsyncMock(return_value="active")
+        mock_locator.evaluate = AsyncMock(return_value="input")
+        mock_locator.is_checked = AsyncMock(return_value=True)
+        mock_page.locator = MagicMock(return_value=mock_locator)
+        
         manager.page = mock_page
         manager.gen_code_cache = []
         manager.gen_code_id = None
+        manager.close_async = AsyncMock()
         manager.close = MagicMock()
+        manager.should_fetch_page_source = MagicMock(return_value=True)
         return manager
 
     @pytest.fixture

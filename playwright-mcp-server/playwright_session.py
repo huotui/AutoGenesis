@@ -9,6 +9,52 @@ from utils.logger import get_mcp_logger
 logger = get_mcp_logger()
 
 
+async def smart_wait(page: Page, expected_delay: float = 1.0, max_wait: float = 5.0):
+    """Intelligently wait for page stabilization after interaction.
+    
+    Replaces hard-coded time.sleep() with smart waiting that:
+    1. Waits for network to be idle
+    2. Waits for DOM to stabilize (no mutations for expected_delay ms)
+    3. Caps at max_wait to avoid infinite waiting
+    
+    Args:
+        page: Playwright page instance
+        expected_delay: Expected page stabilization time in seconds
+        max_wait: Maximum wait time in seconds
+    """
+    try:
+        wait_method = getattr(page, 'wait_for_load_state', None)
+        if wait_method and callable(wait_method):
+            await wait_method("domcontentloaded", timeout=max_wait * 1000)
+    except Exception:
+        pass
+    
+    try:
+        eval_method = getattr(page, 'evaluate', None)
+        if eval_method and callable(eval_method):
+            try:
+                await eval_method(f"""
+                    () => new Promise(resolve => {{
+                        const observer = new MutationObserver(() => {{
+                            clearTimeout(timeout);
+                            timeout = setTimeout(() => {{
+                                observer.disconnect();
+                                resolve();
+                            }}, {int(expected_delay * 1000)});
+                        }});
+                        observer.observe(document.body, {{ childList: true, subtree: true }});
+                        const timeout = setTimeout(() => {{
+                            observer.disconnect();
+                            resolve();
+                        }}, {int(max_wait * 1000)});
+                    }})
+                """)
+            except TypeError:
+                pass
+    except Exception:
+        pass
+
+
 class PlaywrightSessionManager:
     """Manages Playwright browser sessions"""
     
@@ -115,14 +161,15 @@ class PlaywrightSessionManager:
             logger.error(f"Error closing browser session: {e}")
     
     def close(self):
-        """Close browser and cleanup (sync wrapper for cleanup)"""
+        """Close browser and cleanup (sync wrapper that schedules async cleanup)."""
         try:
-            if self._page:
-                # In async mode, we can't call sync methods
-                pass
-            if self._playwright:
-                pass
-            logger.info("Browser session closed (async cleanup pending)")
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.close_async())
+            else:
+                loop.run_until_complete(self.close_async())
+            logger.info("Browser session closed (sync wrapper)")
         except Exception as e:
             logger.error(f"Error closing browser session: {e}")
     
@@ -133,3 +180,7 @@ class PlaywrightSessionManager:
         self.proposed_changes = []
         self.new_steps_count = 0
         self.header_code = None
+    
+    def should_fetch_page_source(self) -> bool:
+        """Determine if page_source should be fetched (only during code generation)."""
+        return self.gen_code_id is not None

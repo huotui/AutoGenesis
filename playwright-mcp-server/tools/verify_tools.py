@@ -414,7 +414,7 @@ def register_verify_tools(mcp, session_manager):
             try:
                 await page.get_by_text(text).first.wait_for(state="visible", timeout=5000)
                 resp["status"] = "success"
-            except:
+            except Exception:
                 resp["status"] = "error"
                 resp["error"] = f"Text '{text}' not found on page"
         except Exception as e:

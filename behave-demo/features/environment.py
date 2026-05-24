@@ -27,6 +27,29 @@ session_ready = threading.Event()
 # Global package variable - loaded from environment
 package = os.environ.get('PACKAGE', 'com.microsoft.emmx.canary')
 
+# Retry configuration
+# Supported modes: 'step' (retry failed steps), 'scenario' (retry entire scenario)
+RETRY_CONFIG = {
+    'mode': os.environ.get('RETRY_MODE', 'step'),  # 'step' or 'scenario'
+    'max_attempts': int(os.environ.get('RETRY_MAX_ATTEMPTS', '0'))  # Default 0 retries
+}
+
+def get_retry_config():
+    """Get current retry configuration.
+    
+    Returns:
+        dict: Dictionary with 'mode' and 'max_attempts' keys
+    """
+    return RETRY_CONFIG.copy()
+
+def should_retry_step():
+    """Check if step retry is enabled."""
+    return RETRY_CONFIG['mode'] == 'step' and RETRY_CONFIG['max_attempts'] > 0
+
+def should_retry_scenario():
+    """Check if scenario retry is enabled."""
+    return RETRY_CONFIG['mode'] == 'scenario' and RETRY_CONFIG['max_attempts'] > 0
+
 def load_mcp_config(server_name=None):
     """Load MCP server configuration from .vscode/mcp.json.
 
@@ -403,10 +426,66 @@ def after_scenario(context, scenario):
 
 
 def before_feature(context, feature):
-    for scenario in feature.scenarios:
-        patch_scenario_with_autoretry(scenario, max_attempts=2)
+    config = get_retry_config()
+    print(f"Retry configuration: mode='{config['mode']}', max_attempts={config['max_attempts']}")
+    
+    # Only apply scenario-level retry if explicitly configured
+    if should_retry_scenario():
+        for scenario in feature.scenarios:
+            patch_scenario_with_autoretry(scenario, max_attempts=config['max_attempts'])
+        print(f"Scenario retry mode enabled: each scenario will retry up to {config['max_attempts']} times")
+    else:
+        print(f"Scenario retry mode disabled. Step retry mode: {should_retry_step()}")
 
 def after_step(context, step):
+    config = get_retry_config()
+    
+    if step.status == 'failed' and should_retry_step():
+        # Store failed step info for retry tracking
+        if not hasattr(context, '_step_retry_count'):
+            context._step_retry_count = {}
+        
+        # Create unique key for this step
+        step_key = f"{context.scenario.name}_{step.name}_{step.line}"
+        
+        if step_key not in context._step_retry_count:
+            context._step_retry_count[step_key] = 0
+        
+        context._step_retry_count[step_key] += 1
+        retry_count = context._step_retry_count[step_key]
+        
+        if retry_count <= config['max_attempts']:
+            print(f"\n{'='*60}")
+            print(f"STEP RETRY: '{step.name}' failed (attempt {retry_count}/{config['max_attempts']})")
+            print(f"Retrying step...")
+            print(f"{'='*60}\n")
+            # Re-run the failed step
+            try:
+                step.run(context)
+                print(f"Step '{step.name}' succeeded on retry {retry_count}")
+                # Update telemetry for retry success
+                context.telemetry_client.track_metric(
+                    "TestStepRetried", 1,
+                    properties={
+                        "Platform": "", 
+                        "Status": 'Passed',
+                        "RetryCount": str(retry_count),
+                        "RunSource": "OpenSource"
+                    }
+                )
+            except Exception as e:
+                print(f"Step '{step.name}' failed again on retry {retry_count}: {e}")
+                context.telemetry_client.track_metric(
+                    "TestStepRetried", 1,
+                    properties={
+                        "Platform": "", 
+                        "Status": 'Failed',
+                        "RetryCount": str(retry_count),
+                        "RunSource": "OpenSource"
+                    }
+                )
+    
+    # Track telemetry for all executed steps
     if step.status != 'skipped':
         context.telemetry_client.track_metric(
             "TestStepExecuted", 1,
@@ -414,6 +493,6 @@ def after_step(context, step):
                 "Platform": "", 
                 "Status": 'Passed' if step.status == 'passed' else 'Failed',
                 "RunSource": "OpenSource"
-                }
+            }
         )
         context.telemetry_client.flush()

@@ -253,7 +253,58 @@ Run a specific test scenario by name:
 
     uv run python -m behave --name "Scenario Name"
 
-#### 8.2 More Options
+#### 8.2 Retry Configuration
+
+The test framework supports configurable retry strategies to handle flaky tests:
+
+**Retry Modes:**
+
+| Mode | Description | Behavior |
+|------|-------------|----------|
+| `step` (default) | Single step retry | Only retries the failed step, not the entire scenario |
+| `scenario` | Scenario retry | Re-executes the entire scenario from the beginning when any step fails |
+
+**Configuration via Environment Variables:**
+
+```bash
+# Set retry mode: step or scenario
+$env:RETRY_MODE = "step"
+
+# Set maximum retry attempts (default: 0 = no retry)
+$env:RETRY_MAX_ATTEMPTS = "3"
+```
+
+**Examples:**
+
+```bash
+# Single step retry, maximum 3 attempts
+$env:RETRY_MODE = "step"
+$env:RETRY_MAX_ATTEMPTS = "3"
+uv run python -m behave
+
+# Scenario retry, maximum 2 attempts (re-runs entire scenario)
+$env:RETRY_MODE = "scenario"
+$env:RETRY_MAX_ATTEMPTS = "2"
+uv run python -m behave
+
+# No retry (default behavior)
+uv run python -m behave
+```
+
+**Retry Behavior Details:**
+- **Step Retry Mode**: When a step fails, only that specific step is retried up to the configured number of attempts. Other steps in the scenario are not re-executed.
+- **Scenario Retry Mode**: When any step fails, the entire scenario is re-executed from the first step, up to the configured number of attempts.
+- **Default**: No retry is enabled by default (`RETRY_MAX_ATTEMPTS=0`)
+
+**Retry Output Example:**
+```
+============================================================
+STEP RETRY: 'I should see the borrow success message' failed (attempt 1/3)
+Retrying step...
+============================================================
+```
+
+#### 8.3 More Options
 
 For more Behave run options and usage, please refer to [Behave Official Documentation](https://behave.readthedocs.io/).
 

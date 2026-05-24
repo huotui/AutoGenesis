@@ -1,7 +1,7 @@
 {
   "browser": {
     "browser_name": "chromium",
-    "headless": false,
+    "headless": true,
     "viewport": {
       "width": 1680,
       "height": 1080

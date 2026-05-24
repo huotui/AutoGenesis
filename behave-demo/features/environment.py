@@ -140,9 +140,6 @@ def take_screenshot(context, scenario_name):
             # Fallback to default location if env var not set
             current_dir = pathlib.Path(__file__).parent.parent
             screenshot_dir = current_dir / 'screenshots'
-            logger.warning(
-                f'SCREENSHOT_DIR environment variable not set, using default: {screenshot_dir}'
-            )
         else:
             screenshot_dir = pathlib.Path(screenshot_dir)
 
@@ -163,30 +160,61 @@ def take_screenshot(context, scenario_name):
         # Full path for the screenshot
         screenshot_path = screenshot_dir / filename
 
-        # Check if Playwright MCP server is being used (has screenshot tool)
-        # Try Playwright screenshot tool first, fallback to pywinauto/appium
+        # Try Playwright screenshot tool first, fallback to legacy take_screenshot tool
+        result = None
         try:
+            print(f"Taking screenshot: {screenshot_path}")
             result = call_tool_sync(context, context.session.call_tool(
                 name="screenshot", 
-                arguments={"file_path": str(screenshot_path)}
+                arguments={
+                    "caller": "behave-automation",
+                    "file_path": str(screenshot_path),
+                    "step": f"screenshot_{test_name_pattern}",
+                    "scenario": scenario_name
+                }
             ))
-        except Exception:
-            # Fallback to legacy take_screenshot tool
-            result = call_tool_sync(context, context.session.call_tool(
-                name="take_screenshot", 
-                arguments={"save_path": str(screenshot_path)}
-            ))
+            print(f"Screenshot tool raw result type: {type(result)}")
+            print(f"Screenshot tool raw result: {result}")
+        except Exception as e1:
+            print(f"Playwright screenshot failed: {e1}")
+            import traceback
+            traceback.print_exc()
+            try:
+                # Fallback to legacy take_screenshot tool
+                result = call_tool_sync(context, context.session.call_tool(
+                    name="take_screenshot", 
+                    arguments={"save_path": str(screenshot_path)}
+                ))
+            except Exception as e2:
+                print(f"Legacy screenshot also failed: {e2}")
+                return None
         
-        status = get_tool_json(result).get('status')
+        # Safely get the result JSON
+        if result is None:
+            print(f"Warning: Screenshot tool returned None")
+            return None
+            
+        result_json = get_tool_json(result)
+        if result_json is None:
+            print(f"Warning: Could not parse screenshot result for {screenshot_path}")
+            # Even if we can't parse the result, check if the file was created
+            if os.path.exists(screenshot_path):
+                print(f'Screenshot file exists: {screenshot_path}')
+                return str(screenshot_path)
+            return None
+        
+        status = result_json.get('status') if isinstance(result_json, dict) else None
         if status == "success":
-            logger.info(f'Screenshot saved: {screenshot_path}')
+            print(f'Screenshot saved: {screenshot_path}')
             return str(screenshot_path)
         else:
-            logger.error(f'Screenshot failed: {get_tool_json(result)}')
+            print(f'Screenshot failed: {result_json}')
             return None
 
     except Exception as e:
-        logger.error(f'Error taking screenshot: {str(e)}')
+        print(f'Error taking screenshot: {str(e)}')
+        import traceback
+        traceback.print_exc()
         return None
 
 def clean_test_name(name):

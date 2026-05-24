@@ -357,6 +357,17 @@ def before_scenario(context, scenario):
         print(f"Skipping scenario '{scenario.name}' because it is marked as WIP.")
         scenario.skip("Scenario is marked as WIP")
         return
+    
+    # Clear browser state before each scenario to avoid session carryover
+    try:
+        result = call_tool_sync(context, context.session.call_tool(
+            name="browser_close",
+            arguments={'caller': 'behave-automation'}
+        ))
+        print(f"Browser closed before scenario: {scenario.name}")
+    except Exception as e:
+        print(f"Warning: Failed to close browser before scenario: {e}")
+    
     pass
 
 def after_scenario(context, scenario):

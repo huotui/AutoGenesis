@@ -249,6 +249,13 @@ Before running tests, ensure `playwright-mcp-server/conf/playwright_conf.json` i
 | `select_option` | Select dropdown option | `locator_value`, `option_value`, `locator_strategy`, `caller` |
 | `execute_javascript` | Execute JS on page | `script`, `caller` |
 
+### File Upload & Download
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `upload_file` | Upload one or multiple files to file input element | `locator_value`, `file_paths` (list), `locator_strategy`, `caller` |
+| `wait_for_download` | Wait for file download to complete and return downloaded file information | `download_dir`, `timeout`, `caller` |
+| `verify_download_exists` | Verify file was downloaded successfully | `file_name`, `download_dir`, `caller` |
+
 ### Element Discovery
 | Tool | Description | Parameters |
 |------|-------------|------------|

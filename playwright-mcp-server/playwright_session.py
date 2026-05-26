@@ -3,6 +3,7 @@
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from typing import Optional, Dict, Any
+import os
 import logging
 from utils.logger import get_mcp_logger
 
@@ -114,6 +115,9 @@ class PlaywrightSessionManager:
         if extra_http_headers:
             context_options["extra_http_headers"] = extra_http_headers
             logger.info(f"Custom HTTP headers configured: {list(extra_http_headers.keys())}")
+        
+        download_dir = browser_config.get("download_dir", os.path.join(os.path.expanduser("~"), "Downloads"))
+        logger.info(f"Downloads enabled, save to: {download_dir}")
         
         self._context = await self._browser.new_context(**context_options)
         self._context.set_default_timeout(browser_config.get("timeout", 30000))

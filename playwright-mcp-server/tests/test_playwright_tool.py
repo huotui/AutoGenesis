@@ -448,3 +448,236 @@ class TestPlaywrightTools:
         response = json.loads(result)
         assert response["status"] == "success"
         assert "page_source_summary" in response["data"]
+
+    @pytest.mark.asyncio
+    async def test_upload_file_single_file(self, tools, mock_session_manager):
+        mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
+        mock_element.set_input_files = AsyncMock()
+        mock_session_manager.page.locator.return_value = mock_element
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("test content")
+            temp_path = f.name
+        
+        try:
+            result = await tools['upload_file'](
+                caller="test",
+                locator_value="#file-input",
+                locator_strategy="css",
+                file_paths=[temp_path]
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert len(response["data"]["uploaded_files"]) == 1
+            assert response["data"]["uploaded_files"][0].endswith(".txt")
+            mock_element.set_input_files.assert_awaited_once()
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_upload_file_multiple_files(self, tools, mock_session_manager):
+        mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
+        mock_element.set_input_files = AsyncMock()
+        mock_session_manager.page.locator.return_value = mock_element
+        mock_session_manager.page.content = AsyncMock(return_value="<html></html>")
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f1:
+            f1.write("content 1")
+            temp_path1 = f1.name
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.pdf', delete=False) as f2:
+            f2.write("content 2")
+            temp_path2 = f2.name
+        
+        try:
+            result = await tools['upload_file'](
+                caller="test",
+                locator_value="#file-input",
+                locator_strategy="css",
+                file_paths=[temp_path1, temp_path2]
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert len(response["data"]["uploaded_files"]) == 2
+            mock_element.set_input_files.assert_awaited_once()
+        finally:
+            if os.path.exists(temp_path1):
+                os.unlink(temp_path1)
+            if os.path.exists(temp_path2):
+                os.unlink(temp_path2)
+
+    @pytest.mark.asyncio
+    async def test_upload_file_not_found(self, tools, mock_session_manager):
+        mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock()
+        mock_session_manager.page.locator.return_value = mock_element
+        
+        result = await tools['upload_file'](
+            caller="test",
+            locator_value="#file-input",
+            locator_strategy="css",
+            file_paths=["/nonexistent/path/file.txt"]
+        )
+        response = json.loads(result)
+        assert response["status"] == "error"
+        assert "File not found" in response["error"]
+
+    @pytest.mark.asyncio
+    async def test_upload_file_element_not_attached(self, tools, mock_session_manager):
+        mock_element = MagicMock()
+        mock_element.wait_for = AsyncMock(side_effect=Exception("Element not attached"))
+        mock_session_manager.page.locator.return_value = mock_element
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("test content")
+            temp_path = f.name
+        
+        try:
+            result = await tools['upload_file'](
+                caller="test",
+                locator_value="#missing-input",
+                locator_strategy="css",
+                file_paths=[temp_path]
+            )
+            response = json.loads(result)
+            assert response["status"] == "error"
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+    @pytest.mark.asyncio
+    async def test_wait_for_download_success(self, tools, mock_session_manager):
+        mock_download = AsyncMock()
+        mock_download.suggested_filename = "test_file.pdf"
+        mock_download.save_as = AsyncMock()
+        
+        class MockDownloadInfo:
+            @property
+            async def value(self):
+                return mock_download
+        
+        class MockExpectDownload:
+            async def __aenter__(self):
+                return MockDownloadInfo()
+            async def __aexit__(self, *args):
+                pass
+        
+        mock_session_manager.page.expect_download.return_value = MockExpectDownload()
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = await tools['wait_for_download'](
+                caller="test",
+                download_dir=temp_dir,
+                timeout=5000
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert response["data"]["file_name"] == "test_file.pdf"
+            mock_download.save_as.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_wait_for_download_timeout(self, tools, mock_session_manager):
+        class MockExpectDownloadTimeout:
+            async def __aenter__(self):
+                raise Exception("Timeout waiting for download")
+            async def __aexit__(self, *args):
+                pass
+        
+        mock_session_manager.page.expect_download.return_value = MockExpectDownloadTimeout()
+        
+        result = await tools['wait_for_download'](
+            caller="test",
+            download_dir="/tmp/downloads",
+            timeout=1000
+        )
+        response = json.loads(result)
+        assert response["status"] == "error"
+        assert "Timeout" in response["error"]
+
+    @pytest.mark.asyncio
+    async def test_wait_for_download_default_dir(self, tools, mock_session_manager):
+        mock_download = AsyncMock()
+        mock_download.suggested_filename = "downloaded.txt"
+        mock_download.save_as = AsyncMock()
+        
+        class MockDownloadInfo:
+            @property
+            async def value(self):
+                return mock_download
+        
+        class MockExpectDownload:
+            async def __aenter__(self):
+                return MockDownloadInfo()
+            async def __aexit__(self, *args):
+                pass
+        
+        mock_session_manager.page.expect_download.return_value = MockExpectDownload()
+        
+        result = await tools['wait_for_download'](
+            caller="test"
+        )
+        response = json.loads(result)
+        assert response["status"] == "success"
+        mock_download.save_as.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_download_exists_with_filename(self, tools, mock_session_manager):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_file = os.path.join(temp_dir, "test_download.pdf")
+            with open(test_file, 'w') as f:
+                f.write("downloaded content")
+            
+            result = await tools['verify_download_exists'](
+                caller="test",
+                file_name="test_download.pdf",
+                download_dir=temp_dir
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert response["data"]["file_exists"] is True
+            assert response["data"]["file_size"] > 0
+
+    @pytest.mark.asyncio
+    async def test_verify_download_exists_file_not_found(self, tools, mock_session_manager):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = await tools['verify_download_exists'](
+                caller="test",
+                file_name="nonexistent.pdf",
+                download_dir=temp_dir
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert response["data"]["file_exists"] is False
+
+    @pytest.mark.asyncio
+    async def test_verify_download_exists_any_file(self, tools, mock_session_manager):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_file = os.path.join(temp_dir, "auto_download.txt")
+            with open(test_file, 'w') as f:
+                f.write("content")
+            
+            result = await tools['verify_download_exists'](
+                caller="test",
+                file_name="",
+                download_dir=temp_dir
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert response["data"]["file_exists"] is True
+            assert len(response["data"]["files"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_verify_download_exists_empty_dir(self, tools, mock_session_manager):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = await tools['verify_download_exists'](
+                caller="test",
+                file_name="",
+                download_dir=temp_dir
+            )
+            response = json.loads(result)
+            assert response["status"] == "success"
+            assert response["data"]["file_exists"] is False

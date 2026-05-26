@@ -531,6 +531,72 @@ Took 0m5.077s
 | `screenshot` | 截取截图 | `file_path`（可选） |
 | `execute_javascript` | 执行 JavaScript 代码 | `script`（字符串） |
 
+### 文件上传与下载
+
+| 工具名称 | 说明 | 参数 |
+|----------|------|------|
+| `upload_file` | 上传单个或多个文件到文件输入元素 | `locator_value`、`file_paths`（列表）、`locator_strategy` |
+| `wait_for_download` | 等待下载完成并返回下载文件信息 | `download_dir`（可选）、`timeout`（毫秒，默认30000） |
+| `verify_download_exists` | 验证文件是否已下载成功 | `file_name`（可选）、`download_dir`（可选） |
+
+**文件上传示例：**
+
+```python
+# 上传单个文件
+upload_file(
+    locator_value="#file-input",
+    locator_strategy="css",
+    file_paths=["/absolute/path/to/file.txt"]
+)
+
+# 上传多个文件
+upload_file(
+    locator_value="#file-input",
+    locator_strategy="css",
+    file_paths=["/path/to/file1.txt", "/path/to/file2.pdf"]
+)
+```
+
+**文件下载示例：**
+
+```python
+# 等待下载完成（使用默认下载目录）
+wait_for_download(
+    timeout=30000
+)
+
+# 等待下载完成（指定下载目录）
+wait_for_download(
+    download_dir="./downloads",
+    timeout=30000
+)
+
+# 验证特定文件已下载
+verify_download_exists(
+    file_name="downloaded_file.pdf",
+    download_dir="./downloads"
+)
+
+# 验证下载目录中是否有任何文件
+verify_download_exists(
+    download_dir="./downloads"
+)
+```
+
+**配置文件设置：**
+
+在 `conf/playwright_conf.json` 中可以配置下载目录：
+
+```json
+{
+  "browser": {
+    "browser_name": "chromium",
+    "headless": false,
+    "download_dir": "./downloads"
+  }
+}
+```
+
 ### 代码生成工具
 
 | 工具名称 | 说明 | 参数 |

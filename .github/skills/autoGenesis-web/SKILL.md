@@ -133,13 +133,16 @@ CRITICAL REQUIREMENTS - MUST FOLLOW EXACTLY:
 
 5. **ERROR HANDLING & RETRY STRATEGY**:
    - Retry alternative approaches in this order (keep trying until one succeeds):
-     * Try different locator strategies (CSS, XPath, ID, text, etc.)
-     * Try alternative element attributes or text values
-     * Try finding similar elements with different properties
-     * Try waiting for element to be visible/attached before retrying the action
-     * Try clicking element before typing (some inputs need focus first)
-     * Break complex steps into smaller MCP operations if needed
-     * For navigation: try different URL formats or wait for page load
+     * **Level 1 - Standard Locators**: Try different locator strategies (CSS, XPath, ID, text, etc.)
+     * **Level 2 - DOM Analysis**: Extract page DOM, analyze HTML structure, find elements by context (labels, parent containers, sibling elements)
+     * **Level 3 - JavaScript Evaluation**: Use execute_javascript to find elements, trigger events, or interact with Vue/React components directly
+     * **Level 4 - Alternative Attributes**: Try alternative element attributes or text values
+     * **Level 5 - Similar Elements**: Try finding similar elements with different properties
+     * **Level 6 - Wait & Retry**: Try waiting for element to be visible/attached before retrying the action
+     * **Level 7 - Focus First**: Try clicking element before typing (some inputs need focus first)
+     * **Level 8 - Break Down Steps**: Break complex steps into smaller MCP operations if needed
+     * **Level 9 - Navigation Retry**: For navigation: try different URL formats or wait for page load
+     * **Level 10 - AI Screenshot Analysis**: Capture screenshot and use verify_visual_task or evaluate_web_visual_task to locate elements visually, then use coordinates with document.elementFromPoint()
    - **MANDATORY**: After each retry attempt, explicitly report the result
    - **PERSISTENCE RULE**: Keep trying alternatives until the step operation succeeds
    - **DO NOT ASSUME SUCCESS** - every MCP call must be verified
@@ -151,6 +154,21 @@ CRITICAL REQUIREMENTS - MUST FOLLOW EXACTLY:
    - Use ONLY playwright-mcp-server MCP tools
    - Never modify, merge, skip, or add steps
    - When retrying, use the most successful approach in final generated code
+
+7. **LANGUAGE REQUIREMENT - CRITICAL**:
+   - ALL step definition decorators MUST use English keywords (Given, When, Then, And, But)
+   - ALL step pattern strings MUST be in English format
+   - Examples of correct format:
+     * `@given('I navigate to "{url}"')` ✓
+     * `@when('I click the "{button}" button')` ✓
+     * `@then('I should see "{text}"')` ✓
+   - Examples of incorrect format (DO NOT USE):
+     * `@given('导航到{url}')` ✗
+     * `@when('点击{button}按钮')` ✗
+     * `@then('应该看到{text}')` ✗
+   - Step implementation comments may be in Chinese if needed
+   - Page element locators and data values (URLs, form inputs, button text) should match actual application text (can be Chinese)
+   - This ensures the step patterns are internationally understandable and follow BDD conventions
 
 REMEMBER: Every step must be validated through MCP tools, not through your own analysis. When encountering errors, **RETRY with different approaches**. **Continue retrying until each operation succeeds**.
 
@@ -298,3 +316,100 @@ Before running tests, ensure `playwright-mcp-server/conf/playwright_conf.json` i
 | XPath | `//input[@name="wd"]` | Complex queries |
 | ID | `#search-box` | Unique elements |
 | Text | `text=Click Here` | Button/link text |
+
+## Advanced Element Location Strategies
+
+### Strategy 1: DOM/Source Code Analysis
+
+When standard locator strategies fail to find elements, use DOM/source code analysis:
+
+**Step 1: Extract Page DOM Structure**
+```javascript
+// Get all interactive elements with their attributes
+() => {
+  const elements = Array.from(document.querySelectorAll('input, button, select, textarea, a, [role="button"], [role="link"]'));
+  return elements.map(el => ({
+    tag: el.tagName,
+    type: el.type,
+    id: el.id,
+    name: el.name,
+    placeholder: el.placeholder,
+    text: el.textContent?.trim(),
+    class: el.className,
+    role: el.getAttribute('role'),
+    ariaLabel: el.getAttribute('aria-label')
+  }));
+}
+```
+
+**Step 2: Analyze Page Source for Element Patterns**
+```javascript
+// Get the full HTML structure of the page or specific sections
+() => document.body.innerHTML
+// Or for a specific section:
+() => document.querySelector('.main-content')?.innerHTML
+```
+
+**Step 3: Identify Elements by Context**
+- Look for form elements by their surrounding `<form>` or `<div>` containers
+- Identify buttons by their parent container classes (e.g., `.el-dialog`, `.modal-footer`)
+- Find inputs by their associated `<label>` elements or placeholder text
+- Use hierarchical relationships (e.g., `parent > child`, `sibling + sibling`)
+
+**Step 4: Build Locators from Analysis**
+- Extract unique attributes (id, name, data-testid, etc.)
+- Use CSS selectors based on element hierarchy
+- Create XPath expressions for complex relationships
+- Identify Vue/React component patterns (e.g., `el-input`, `v-model` bindings)
+
+### Strategy 2: AI Screenshot Analysis Fallback
+
+When both standard locators and DOM analysis fail, use screenshot-based AI analysis:
+
+**Step 1: Capture Screenshot**
+```
+Call: screenshot
+Parameters: file_path="<path>/screenshot.png", caller="behave-automation"
+```
+
+**Step 2: Analyze Screenshot with AI Vision**
+```
+Call: verify_visual_task or evaluate_web_visual_task
+Parameters: 
+  - screenshot_path: "<path>/screenshot.png"
+  - task_description: "Find and describe the location of [element description]. Return the approximate coordinates and any visible text, labels, or identifiers associated with this element."
+  - caller: "behave-automation"
+```
+
+**Step 3: Use Coordinates for Element Location**
+Based on the AI analysis results:
+- If coordinates are provided, use JavaScript to click at those coordinates:
+  ```javascript
+  () => {
+    // Click at approximate coordinates from AI analysis
+    const element = document.elementFromPoint(x, y);
+    if (element) {
+      element.click();
+      return 'Clicked element at coordinates';
+    }
+    return 'No element found at coordinates';
+  }
+  ```
+
+**Step 4: Fallback Visual Verification**
+- Use `verify_visual_task` to confirm element presence after actions
+- Compare before/after screenshots to verify state changes
+- Use visual cues (colors, icons, text) to confirm successful operations
+
+**When to Use Each Strategy:**
+
+| Situation | Recommended Strategy |
+|-----------|---------------------|
+| Standard elements (inputs, buttons, links) | CSS/XPath/ID/Text |
+| Dynamic frameworks (Vue, React) | DOM Analysis + JavaScript evaluation |
+| Canvas/SVG elements | DOM Analysis |
+| Shadow DOM elements | DOM Analysis (traverse shadowRoot) |
+| Complex visual layouts | AI Screenshot Analysis |
+| Elements with dynamic IDs | DOM Analysis (find by context) |
+| Custom components | AI Screenshot Analysis → DOM Analysis |
+| When all else fails | AI Screenshot Analysis (last resort) |

@@ -74,6 +74,8 @@ class PlaywrightSessionManager:
         self.proposed_changes = []
         self.new_steps_count = 0
         self.header_code = None
+        self.code_format = 'mcp'
+        self.test_func_name = None
         
         # Tool execution guard
         self.is_executing = False

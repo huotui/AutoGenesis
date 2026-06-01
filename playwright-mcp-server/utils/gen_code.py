@@ -36,6 +36,14 @@ from common.mcp_client import MCPClient
 from common.attach import readAttach_mcp
 """
 
+NATIVE_PLAYWRIGHT_HEADER_TEMPLATE = """import os
+import pytest
+import allure
+import asyncio
+from playwright.async_api import async_playwright, expect
+from common.attach import readAttach_mcp
+"""
+
 TOOL_PARAMS_REPLACE_MAP = {}
 
 
@@ -376,6 +384,237 @@ def generate_step_definition(step_info) -> str:
     return code_text
 
 
+def generate_native_playwright_definition(step_info) -> str:
+    tool_name = step_info.get("tool_name")
+    tool_params = step_info.get("tool_params", {})
+    step_text = step_info.get("step_text_raw", "")
+    scenario = step_info.get("scenario", "")
+    
+    if not step_text:
+        step_text = tool_params.get("step", "")
+    
+    if not scenario:
+        scenario = tool_params.get("scenario", "")
+    
+    code_text = ""
+    
+    if tool_name == "browser_navigate":
+        url = tool_params.get("url", "")
+        code_text = f'''
+        await page.goto("{url}")
+        await page.wait_for_load_state("networkidle")
+'''
+    elif tool_name == "click_element":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await page.locator("{locator}").click()
+'''
+    elif tool_name == "send_keys":
+        locator_value = tool_params.get("locator_value", "")
+        text = tool_params.get("text", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await page.locator("{locator}").fill("{text}")
+'''
+    elif tool_name == "press_key":
+        key = tool_params.get("key", "")
+        code_text = f'''
+        await page.keyboard.press("{key}")
+'''
+    elif tool_name == "hover_element":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await page.locator("{locator}").hover()
+'''
+    elif tool_name == "select_option":
+        locator_value = tool_params.get("locator_value", "")
+        option_value = tool_params.get("option_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await page.locator("{locator}").select_option("{option_value}")
+'''
+    elif tool_name == "get_text":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        text_content = await page.locator("{locator}").text_content()
+'''
+    elif tool_name == "get_page_title":
+        code_text = f'''
+        page_title = await page.title()
+'''
+    elif tool_name == "get_page_url":
+        code_text = f'''
+        page_url = page.url
+'''
+    elif tool_name == "wait_for_element":
+        locator_value = tool_params.get("locator_value", "")
+        timeout = tool_params.get("timeout", 5000)
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        timeout_sec = timeout / 1000.0
+        code_text = f'''
+        await page.wait_for_selector("{locator}", timeout={timeout})
+'''
+    elif tool_name == "find_element":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        element = page.locator("{locator}")
+'''
+    elif tool_name == "scroll_page":
+        direction = tool_params.get("direction", "down")
+        amount = tool_params.get("amount", 300)
+        scroll_value = amount if direction == "down" else -amount
+        code_text = f'''
+        await page.evaluate("window.scrollBy(0, {scroll_value})")
+'''
+    elif tool_name == "scroll_to_element":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await page.locator("{locator}").scroll_into_view_if_needed()
+'''
+    elif tool_name == "execute_javascript":
+        script = tool_params.get("script", "")
+        script_escaped = script.replace('\\', '\\\\').replace('"', '\\"')
+        code_text = f'''
+        result = await page.evaluate("{script_escaped}")
+'''
+    elif tool_name == "screenshot":
+        code_text = f'''
+        screenshot_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "log",
+            "screenshot",
+            "screenshot_{test_func_name}.png"
+        )
+        await page.screenshot(path=screenshot_path)
+        readAttach_mcp(screenshot_path, "{test_func_name}")
+'''
+    elif tool_name == "verify_element_exists":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await expect(page.locator("{locator}")).to_be_visible()
+'''
+    elif tool_name == "verify_element_not_exists":
+        locator_value = tool_params.get("locator_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await expect(page.locator("{locator}")).not_to_be_visible()
+'''
+    elif tool_name == "verify_text_on_page":
+        text = tool_params.get("text", "")
+        code_text = f'''
+        await expect(page).to_contain_text("{text}")
+'''
+    elif tool_name == "verify_element_value":
+        locator_value = tool_params.get("locator_value", "")
+        expected_value = tool_params.get("expected_value", "")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await expect(page.locator("{locator}")).to_have_value("{expected_value}")
+'''
+    elif tool_name == "verify_element_attribute":
+        locator_value = tool_params.get("locator_value", "")
+        attribute_name = tool_params.get("attribute_name", "")
+        expected_value = tool_params.get("expected_value", "")
+        rule = tool_params.get("rule", "==")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        code_text = f'''
+        await expect(page.locator("{locator}")).to_have_attribute("{attribute_name}", "{expected_value}")
+'''
+    elif tool_name == "verify_checkbox_state":
+        locator_value = tool_params.get("locator_value", "")
+        expected_state = tool_params.get("expected_state", "checked")
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        if expected_state == "checked":
+            code_text = f'''
+        await expect(page.locator("{locator}")).to_be_checked()
+'''
+        else:
+            code_text = f'''
+        await expect(page.locator("{locator}")).not_to_be_checked()
+'''
+    elif tool_name == "upload_file":
+        locator_value = tool_params.get("locator_value", "")
+        file_paths = tool_params.get("file_paths", [])
+        locator_strategy = tool_params.get("locator_strategy", "css")
+        locator = get_playwright_locator(locator_strategy, locator_value)
+        file_paths_str = str(file_paths).replace("'", '"')
+        code_text = f'''
+        async with page.expect_file_chooser() as fc_info:
+            await page.locator("{locator}").click()
+        file_chooser = await fc_info.value
+        await file_chooser.set_files({file_paths_str})
+'''
+    elif tool_name == "wait_for_download":
+        timeout = tool_params.get("timeout", 30000)
+        code_text = f'''
+        async with page.expect_download(timeout={timeout}) as download_info:
+            pass
+        download = await download_info.value
+'''
+    elif tool_name == "verify_download_exists":
+        file_name = tool_params.get("file_name", "")
+        code_text = f'''
+        import glob
+        download_dir = os.path.join(os.getcwd(), "downloads")
+        files = glob.glob(os.path.join(download_dir, "{file_name if file_name else '*'}"))
+        assert len(files) > 0, "Download file not found"
+'''
+    elif tool_name == "verify_visual_task":
+        screenshot_path = tool_params.get("screenshot_path", "")
+        task_description = tool_params.get("task_description", "")
+        code_text = f'''
+        await page.screenshot(path="{screenshot_path}")
+        await readAttach_mcp("{screenshot_path}", "{test_func_name}")
+'''
+    elif tool_name == "evaluate_web_visual_task":
+        screenshot_path = tool_params.get("screenshot_path", "")
+        task_description = tool_params.get("task_description", "")
+        code_text = f'''
+        await page.screenshot(path="{screenshot_path}")
+        await readAttach_mcp("{screenshot_path}", "{test_func_name}")
+'''
+    else:
+        code_text = f'''
+        pass
+'''
+    
+    return code_text
+
+
+def get_playwright_locator(strategy, value):
+    if strategy == "css":
+        return value
+    elif strategy == "xpath":
+        return f"xpath={value}"
+    elif strategy == "id":
+        return f"#{value}"
+    elif strategy == "text":
+        return f"text={value}"
+    elif strategy == "role":
+        return f"role={value}"
+    else:
+        return value
+
+
 def extract_steps_from_cache(gen_code_id, gen_code_cache):
     dedupe_set = set()
     steps = []
@@ -396,23 +635,27 @@ def extract_steps_from_cache(gen_code_id, gen_code_cache):
     return steps
 
 
-def gen_code_preview(session_manager) -> dict:
+def gen_code_preview(session_manager, code_format: str = "mcp") -> dict:
     new_steps_code = []
     
     steps = extract_steps_from_cache(session_manager.gen_code_id, session_manager.gen_code_cache)
-    logger.info(f"Processing {len(steps)} extracted steps")
+    logger.info(f"Processing {len(steps)} extracted steps with format: {code_format}")
 
     test_func_name = f"test_{session_manager.gen_code_id.replace('-', '_')[:30]}"
     
     for item in steps:
         item["test_func_name"] = test_func_name
-        step_code = generate_step_definition(item)
+        if code_format == "native":
+            step_code = generate_native_playwright_definition(item)
+        else:
+            step_code = generate_step_definition(item)
         if step_code:
             new_steps_code.append(step_code)
 
     session_manager.proposed_changes = new_steps_code
     session_manager.new_steps_count = len(new_steps_code)
     session_manager.test_func_name = test_func_name
+    session_manager.code_format = code_format
     
     if not new_steps_code:
         return {'diff_preview': 'No new code changes to apply', 'new_steps_code': []}

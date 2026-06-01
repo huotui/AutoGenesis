@@ -10,7 +10,7 @@ import time
 import uuid
 from pathlib import Path
 from utils.logger import log_tool_call
-from utils.gen_code import PYTEST_HEADER_TEMPLATE, TESTCASE_DIR, TARGET_TEST_FILE_DEFAULT
+from utils.gen_code import PYTEST_HEADER_TEMPLATE, NATIVE_PLAYWRIGHT_HEADER_TEMPLATE, TESTCASE_DIR, TARGET_TEST_FILE_DEFAULT
 from utils.gen_code import gen_code_preview
 from utils.response_format import format_tool_response, init_tool_response
 from utils.logger import get_mcp_logger
@@ -24,7 +24,7 @@ def register_gen_code_tools(mcp, session_manager):
     
     @mcp.tool()
     @log_tool_call
-    async def before_gen_code(feature_file: str = '', step_file: str = '') -> str:
+    async def before_gen_code(feature_file: str = '', step_file: str = '', code_format: str = 'mcp') -> str:
         """
         Clear cache and initialize code generation session before executing test case steps.
         
@@ -37,6 +37,8 @@ def register_gen_code_tools(mcp, session_manager):
                 If not specified, do not provide a random value.
             step_file (str, optional): Full absolute path to the Python step definition file (.py).
                 If not specified, do not provide a random value.
+            code_format (str, optional): Code generation format. 'mcp' for MCP-based tests (default),
+                'native' for native Playwright tests with better performance.
                 
         Returns:
             str: JSON response containing:
@@ -49,7 +51,8 @@ def register_gen_code_tools(mcp, session_manager):
             resp = init_tool_response()
             session_manager.clear_gen_code_cache()
             session_manager.gen_code_id = str(uuid.uuid4())
-            logger.info(f"[GEN CODE START]:{session_manager.gen_code_id}")
+            session_manager.code_format = code_format
+            logger.info(f"[GEN CODE START]:{session_manager.gen_code_id}, format:{code_format}")
         
             if step_file and step_file.endswith('.py'):
                 session_manager.step_file_target = step_file
@@ -67,6 +70,7 @@ def register_gen_code_tools(mcp, session_manager):
                 "gen_code_id": session_manager.gen_code_id,
                 "steps_dir": session_manager.steps_dir,
                 "step_file_target": session_manager.step_file_target,
+                "code_format": code_format,
             }
         except Exception as e:
             resp["error"] = f"Error during code generation: {repr(e)}"
@@ -77,7 +81,7 @@ def register_gen_code_tools(mcp, session_manager):
     
     @mcp.tool()
     @log_tool_call
-    async def preview_code_changes() -> str:
+    async def preview_code_changes(code_format: str = '') -> str:
         """Preview generated test code changes and confirm before applying"""
         resp = init_tool_response()
         
@@ -86,9 +90,10 @@ def register_gen_code_tools(mcp, session_manager):
             resp["data"] = {"message": "No pending code changes to preview"}
             return json.dumps(format_tool_response(resp))
         
-        result = gen_code_preview(session_manager)
+        format_to_use = code_format if code_format else getattr(session_manager, 'code_format', 'mcp')
+        result = gen_code_preview(session_manager, format_to_use)
         resp["status"] = "success"
-        resp["data"] = {"diff_preview": result.get('diff_preview')}
+        resp["data"] = {"diff_preview": result.get('diff_preview'), "code_format": format_to_use}
         
         return json.dumps(format_tool_response(resp))
 
@@ -117,43 +122,81 @@ def register_gen_code_tools(mcp, session_manager):
             if not scenario_name:
                 scenario_name = "自动生成的测试场景"
             
-            test_content = PYTEST_HEADER_TEMPLATE + "\n"
-            test_content += f'\n\n@allure.epic("{scenario_name}")\n'
-            test_content += f'@allure.title("{scenario_name}")\n'
-            test_content += f'@pytest.mark.asyncio\n'
-            test_content += f'async def {test_func_name}():\n'
-            test_content += f'    """{scenario_name}"""\n'
-            test_content += f'    client = MCPClient()\n'
-            test_content += f'    \n'
-            test_content += f'    try:\n'
-            test_content += f'        await client.connect()\n'
-            test_content += f'        \n'
-            test_content += f'        await asyncio.sleep(2)\n'
+            code_format = getattr(session_manager, 'code_format', 'mcp')
             
-            has_screenshot = False
-            for step_code in session_manager.proposed_changes:
-                test_content += step_code + "\n"
-                if "screenshot" in step_code:
-                    has_screenshot = True
-            
-            if not has_screenshot:
+            if code_format == "native":
+                test_content = NATIVE_PLAYWRIGHT_HEADER_TEMPLATE + "\n"
+                test_content += f'\n\n@allure.epic("{scenario_name}")\n'
+                test_content += f'@allure.title("{scenario_name}")\n'
+                test_content += f'@pytest.mark.asyncio\n'
+                test_content += f'async def {test_func_name}():\n'
+                test_content += f'    """{scenario_name}"""\n'
+                test_content += f'    async with async_playwright() as p:\n'
+                test_content += f'        browser = await p.chromium.launch(headless=False)\n'
+                test_content += f'        context = await browser.new_context()\n'
+                test_content += f'        page = await context.new_page()\n'
                 test_content += f'        \n'
-                test_content += f'        screenshot_path = os.path.join(\n'
-                test_content += f'            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),\n'
-                test_content += f'            "log",\n'
-                test_content += f'            "screenshot",\n'
-                test_content += f'            "{test_func_name}.png"\n'
-                test_content += f'        )\n'
-                test_content += f'        await client.screenshot(\n'
-                test_content += f'            file_path=screenshot_path,\n'
-                test_content += f'            step="Take screenshot",\n'
-                test_content += f'            scenario="{scenario_name}"\n'
-                test_content += f'        )\n'
-                test_content += f'        readAttach_mcp(screenshot_path, "{test_func_name}")\n'
-            
-            test_content += f'    \n'
-            test_content += f'    finally:\n'
-            test_content += f'        await client.close()\n'
+                test_content += f'        try:\n'
+                
+                has_screenshot = False
+                for step_code in session_manager.proposed_changes:
+                    test_content += step_code + "\n"
+                    if "screenshot" in step_code:
+                        has_screenshot = True
+                
+                if not has_screenshot:
+                    test_content += f'            \n'
+                    test_content += f'            screenshot_path = os.path.join(\n'
+                    test_content += f'                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),\n'
+                    test_content += f'                "log",\n'
+                    test_content += f'                "screenshot",\n'
+                    test_content += f'                "{test_func_name}.png"\n'
+                    test_content += f'            )\n'
+                    test_content += f'            await page.screenshot(path=screenshot_path)\n'
+                    test_content += f'            readAttach_mcp(screenshot_path, "{test_func_name}")\n'
+                
+                test_content += f'        \n'
+                test_content += f'        finally:\n'
+                test_content += f'            await context.close()\n'
+                test_content += f'            await browser.close()\n'
+            else:
+                test_content = PYTEST_HEADER_TEMPLATE + "\n"
+                test_content += f'\n\n@allure.epic("{scenario_name}")\n'
+                test_content += f'@allure.title("{scenario_name}")\n'
+                test_content += f'@pytest.mark.asyncio\n'
+                test_content += f'async def {test_func_name}():\n'
+                test_content += f'    """{scenario_name}"""\n'
+                test_content += f'    client = MCPClient()\n'
+                test_content += f'    \n'
+                test_content += f'    try:\n'
+                test_content += f'        await client.connect()\n'
+                test_content += f'        \n'
+                test_content += f'        await asyncio.sleep(2)\n'
+                
+                has_screenshot = False
+                for step_code in session_manager.proposed_changes:
+                    test_content += step_code + "\n"
+                    if "screenshot" in step_code:
+                        has_screenshot = True
+                
+                if not has_screenshot:
+                    test_content += f'        \n'
+                    test_content += f'        screenshot_path = os.path.join(\n'
+                    test_content += f'            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),\n'
+                    test_content += f'            "log",\n'
+                    test_content += f'            "screenshot",\n'
+                    test_content += f'            "{test_func_name}.png"\n'
+                    test_content += f'        )\n'
+                    test_content += f'        await client.screenshot(\n'
+                    test_content += f'            file_path=screenshot_path,\n'
+                    test_content += f'            step="Take screenshot",\n'
+                    test_content += f'            scenario="{scenario_name}"\n'
+                    test_content += f'        )\n'
+                    test_content += f'        readAttach_mcp(screenshot_path, "{test_func_name}")\n'
+                
+                test_content += f'    \n'
+                test_content += f'    finally:\n'
+                test_content += f'        await client.close()\n'
             
             test_file_path.parent.mkdir(parents=True, exist_ok=True)
             test_file_path.write_text(test_content, encoding='utf-8')
@@ -164,9 +207,10 @@ def register_gen_code_tools(mcp, session_manager):
                 "message": f"Generated pytest test file: {test_file_path}",
                 "new_steps_count": session_manager.new_steps_count,
                 "test_file_path": str(test_file_path),
-                "test_func_name": test_func_name
+                "test_func_name": test_func_name,
+                "code_format": code_format
             }
-            logger.info(f"Successfully generated test file: {test_file_path}")
+            logger.info(f"Successfully generated test file: {test_file_path} (format: {code_format})")
         except Exception as e:
             result = f"Error generating test file: {str(e)}"
             logger.error(result)

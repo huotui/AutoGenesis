@@ -1,72 +1,77 @@
 ---
 name: autoGenesis-web
-description: Execute Web BDD test scenarios via playwright-mcp-server with auto code generation. Use when user provides a scenario name and asks to run, execute, or generate test code for web applications. Triggers on phrases like "execute web scenario X", "run playwright test for scenario", "generate test code for web scenario", "use autoGenesis-web skill", or when a scenario name is provided alongside a request to automate or test web apps. Reads scenario steps from .feature files in behave-demo/features/, drives each step through MCP tool calls with persistent retry, then saves generated code via preview_code_changes + confirm_code_changes.
+description: Execute Web test scenarios via playwright-mcp-server with auto code generation. Use when user provides a scenario name and asks to run, execute, or generate test code for web applications. Triggers on phrases like "execute web scenario X", "run playwright test for scenario", "generate test code for web scenario", "use autoGenesis-web skill", or when a scenario name is provided alongside a request to automate or test web apps. Reads scenario steps from .feature files in behave-demo/features/, drives each step through MCP tool calls with persistent retry, then saves generated pytest code to testcase directory.
 ---
 
 # AutoGenesis Web
 
-Execute Web BDD test scenarios and automatically generate Python step implementation files using Playwright.
+Execute Web test scenarios and automatically generate Python pytest test files using Playwright.
 
 ## Project Structure
 
 **CRITICAL**: This skill works with the following project structure:
 
 ```
-behave-demo/
-├── features/
-│   ├── *.feature           # Feature files (e.g., web_test.feature)
-│   ├── environment.py      # Behave environment setup
-│   └── steps/
-│       └── *_steps.py      # Generated step implementations (OUTPUT HERE)
+PPA-UI-Automation-master/
+├── testcase/
+│   ├── conftest.py           # Pytest fixtures (Allure)
+│   ├── test_*.py             # Generated test files (OUTPUT HERE)
+│   └── __init__.py
+├── common/
+│   ├── mcp_client.py         # MCP client wrapper (browser operations)
+│   ├── action.py             # Common actions (click_fill_mcp, etc.)
+│   ├── attach.py             # Screenshot and Allure attachment
+│   └── read_file.py          # YAML file reader
+├── data/
+│   └── base.yaml             # Test data configuration
+├── log/
+│   └── screenshot/           # Screenshot storage
+├── setting.py                # Project root path
+├── pytest.ini                # Pytest configuration
+├── run.py                    # Test runner
+└── requirements.txt          # Python dependencies
 ```
 
-**Generated step files MUST be saved to**: `behave-demo/features/steps/`
-
-**NOTE**: The MCP server may try to save to `playwright-mcp-server/behave_demo/features/steps/`. After code generation, you MUST verify the files are in the correct `behave-demo/features/steps/` directory and copy them if needed.
+**Generated test files MUST be saved to**: `PPA-UI-Automation-master/testcase/`
 
 ## Input
 
-- **scenario_name** (required): Name of the scenario to execute, matching the `Scenario:` line in the `.feature` file.
+- **scenario_name** (required): Name of the test scenario to execute.
 - **feature_file** (optional): Path to the `.feature` file. If omitted, search all files under `behave-demo/features/`.
 
 ## Workflow
 
 ### Step 0: Initialize Project Structure (if needed)
 
-**CRITICAL**: Before proceeding, check if `behave-demo/` directory exists in the current working directory.
+**CRITICAL**: Before proceeding, check if `PPA-UI-Automation-master/` directory exists in the current working directory.
 
-**If `behave-demo/` does NOT exist:**
+**If `PPA-UI-Automation-master/` does NOT exist:**
 
-1. Copy the entire `assets/behave-demo/` directory from the skill to the current working directory:
+1. The project structure should already exist with the following key files:
    ```
-   assets/behave-demo/  →  behave-demo/
-   ```
-
-2. Verify the copied structure:
-   ```
-   behave-demo/
-   ├── features/
-   │   ├── *.feature           # Feature files
-   │   ├── environment.py      # Behave environment setup
-   │   └── steps/
-   │       ├── __init__.py
-   │       └── *_steps.py      # Step implementations
-   ├── pyproject.toml          # Project dependencies
-   └── uv.lock                 # Lock file
+   PPA-UI-Automation-master/
+   ├── testcase/
+   │   ├── conftest.py
+   │   └── test_*.py
+   ├── common/
+   ├── data/
+   ├── setting.py
+   ├── pytest.ini
+   └── run.py
    ```
 
-3. Install dependencies:
+2. Install dependencies:
    ```bash
-   cd behave-demo
-   uv sync
+   cd PPA-UI-Automation-master
+   pip install pytest pytest-asyncio allure-pytest mcp httpx
    ```
 
-4. Confirm initialization:
+3. Confirm initialization:
    ```
-   ✅ behave-demo project initialized from assets template
+   ✅ PPA-UI-Automation project ready
    ```
 
-**If `behave-demo/` already exists:**
+**If `PPA-UI-Automation-master/` already exists:**
 - Skip this step and proceed to Step 1
 
 ### Step 1: Locate the Scenario
@@ -128,8 +133,7 @@ CRITICAL REQUIREMENTS - MUST FOLLOW EXACTLY:
    - These two steps are REQUIRED and cannot be skipped
    - **PATH VERIFICATION**: After confirm_code_changes, verify the save location:
      * MCP server reports the path where it saved the file
-     * If saved to `playwright-mcp-server/behave_demo/...`, copy to `behave-demo/features/steps/`
-     * Confirm the correct final location to the user
+     * Generated code should be a pytest test file, NOT a behave steps file
 
 5. **ERROR HANDLING & RETRY STRATEGY**:
    - Retry alternative approaches in this order (keep trying until one succeeds):
@@ -155,20 +159,31 @@ CRITICAL REQUIREMENTS - MUST FOLLOW EXACTLY:
    - Never modify, merge, skip, or add steps
    - When retrying, use the most successful approach in final generated code
 
-7. **LANGUAGE REQUIREMENT - CRITICAL**:
-   - ALL step definition decorators MUST use English keywords (Given, When, Then, And, But)
-   - ALL step pattern strings MUST be in English format
-   - Examples of correct format:
-     * `@given('I navigate to "{url}"')` ✓
-     * `@when('I click the "{button}" button')` ✓
-     * `@then('I should see "{text}"')` ✓
-   - Examples of incorrect format (DO NOT USE):
-     * `@given('导航到{url}')` ✗
-     * `@when('点击{button}按钮')` ✗
-     * `@then('应该看到{text}')` ✗
-   - Step implementation comments may be in Chinese if needed
-   - Page element locators and data values (URLs, form inputs, button text) should match actual application text (can be Chinese)
-   - This ensures the step patterns are internationally understandable and follow BDD conventions
+7. **CODE GENERATION - AUTOMATED**:
+   - **MCP SERVER AUTOMATICALLY RECORDS EXECUTION TRAJECTORY**:
+     * Every MCP tool call is automatically recorded by the server
+     * The `record_calls` decorator captures all tool invocations
+     * Recording includes: tool name, parameters, step description, scenario name
+   
+   - **AUTOMATIC PYTEST FILE GENERATION**:
+     * When you call `confirm_code_changes`, the MCP server will:
+       1. Read the execution trajectory from the cache
+       2. Convert each tool call to corresponding MCPClient async method
+       3. Generate a complete pytest test file with proper format
+       4. Save to `PPA-UI-Automation-master/testcase/test_<feature_name>.py`
+   
+   - **YOU DO NOT NEED TO MANUALLY WRITE CODE**:
+     * The MCP server handles all code generation automatically
+     * Just execute the test steps using MCP tools
+     * Call `preview_code_changes` to review
+     * Call `confirm_code_changes` to save the file
+   
+   - **GENERATED FILE FORMAT** (handled automatically by MCP server):
+     * Proper imports (pytest, allure, asyncio, MCPClient, readAttach_mcp)
+     * Allure decorators (@allure.epic, @allure.title, @pytest.mark.asyncio)
+     * try/finally block with client.connect() and client.close()
+     * All executed steps as async client method calls
+     * Automatic screenshot and Allure attachment at the end
 
 REMEMBER: Every step must be validated through MCP tools, not through your own analysis. When encountering errors, **RETRY with different approaches**. **Continue retrying until each operation succeeds**.
 
@@ -183,63 +198,88 @@ REMEMBER: Every step must be validated through MCP tools, not through your own a
 
 ### Step 3: Post-Execution & Path Verification
 
-**CRITICAL - Verify File Location**:
+**CRITICAL - Automated File Generation via Execution Trajectory**:
 
-After `preview_code_changes` and `confirm_code_changes` are called, you MUST:
+After all test steps are executed via MCP tools, the MCP server has been **automatically recording** every tool call. Now:
 
-1. **Check where the MCP server saved the files**:
-   - The server may report: `playwright-mcp-server/behave_demo/features/steps/web_steps.py`
-   - This is the WRONG location for the behave project
-
-2. **Copy files to the correct location**:
-   - Read the generated code from the MCP server's location
-   - Create/update the file in: `behave-demo/features/steps/<feature_name>_steps.py`
-   - **IMPORTANT**: Use the descriptive filename based on the FEATURE name, NOT the scenario name**
-   - Example: If the feature file is `library_test.feature`, the steps file should be `library_test_steps.py`
-   - Example: If the feature file is `chiphell_test.feature`, the steps file should be `chiphell_test_steps.py`
-
-3. **Confirm the final location** to the user:
+1. **Preview the generated code** (optional but recommended):
    ```
-   ✅ Step file saved to: behave-demo/features/steps/web_steps.py
+   Call: preview_code_changes
+   ```
+   - This shows you the pytest code that will be generated
+   - The code is automatically generated from the execution trajectory
+   - Review to ensure all steps are captured correctly
+
+2. **Confirm and save the test file**:
+   ```
+   Call: confirm_code_changes
+   ```
+   - The MCP server will:
+     * Read all recorded tool calls from the execution trajectory cache
+     * Convert each tool call to corresponding MCPClient async method calls
+     * Generate a complete pytest test file with:
+       - Proper imports and decorators
+       - All executed steps in correct order
+       - try/finally block with proper cleanup
+       - Automatic screenshot and Allure attachment
+     * Save to: `PPA-UI-Automation-master/testcase/test_<feature_name>.py`
+
+3. **Confirm the save location** to the user:
+   ```
+   ✅ Test file saved to: PPA-UI-Automation-master/testcase/test_<name>.py
+   ✅ Test function: test_<function_name>
    ```
 
-4. **Conflict Prevention - CRITICAL**:
-   - The MCP server now automatically detects duplicate step definitions
-   - If a step pattern already exists in any `*_steps.py` file under `behave-demo/features/steps/`, it will be skipped
-   - The server will report: `"Applied X new steps to path (Y conflicts skipped)"`
-   - **IMPORTANT**: Always verify the final step file location matches `behave-demo/features/steps/` NOT `playwright-mcp-server/behave_demo/features/steps/`
+3. **Conflict Prevention - CRITICAL**:
+   - Each execution generates a new test file with unique function name
+   - If a file with the same name already exists, it will be overwritten
+   - To avoid conflicts, use descriptive and unique scenario names
 
-5. **Provide run instructions**:
+4. **Provide run instructions**:
 
 ```bash
-cd behave-demo
-uv run behave --name "{{SCENARIO_NAME}}"
+cd PPA-UI-Automation-master
+pytest -vs --alluredir=./reports/tmp --clean-alluredir
 ```
 
-Or run the entire feature file:
+Or run a specific test:
 
 ```bash
-cd behave-demo
-uv run behave features/<feature_file>.feature
+cd PPA-UI-Automation-master
+pytest testcase/test_<name>.py -vs
 ```
 
 ## Configuration
 
-Before running tests, ensure `playwright-mcp-server/conf/playwright_conf.json` is configured with the target browser:
+Before running tests, ensure:
 
-```json
-{
-  "browser": {
-    "browser_name": "chromium",
-    "headless": false,
-    "viewport": {
-      "width": 1280,
-      "height": 720
-    },
-    "timeout": 30000
-  }
-}
-```
+1. **playwright-mcp-server is installed and configured**:
+   ```bash
+   cd playwright-mcp-server
+   pip install -e .
+   ```
+
+2. **playwright-mcp-server/conf/playwright_conf.json** is configured with the target browser:
+   ```json
+   {
+     "browser": {
+       "browser_name": "chromium",
+       "headless": true,
+       "viewport": {
+         "width": 1680,
+         "height": 1080
+       },
+       "timeout": 30000,
+       "slow_mo": 500
+     }
+   }
+   ```
+
+3. **PPA-UI-Automation-master dependencies**:
+   ```bash
+   cd PPA-UI-Automation-master
+   pip install -r requirements.txt
+   ```
 
 **Browser Options:**
 - `chromium` - Google Chrome / Microsoft Edge
@@ -369,7 +409,7 @@ When both standard locators and DOM analysis fail, use screenshot-based AI analy
 **Step 1: Capture Screenshot**
 ```
 Call: screenshot
-Parameters: file_path="<path>/screenshot.png", caller="behave-automation"
+Parameters: file_path="<path>/screenshot.png", caller="pytest-automation"
 ```
 
 **Step 2: Analyze Screenshot with AI Vision**
@@ -378,7 +418,7 @@ Call: verify_visual_task or evaluate_web_visual_task
 Parameters: 
   - screenshot_path: "<path>/screenshot.png"
   - task_description: "Find and describe the location of [element description]. Return the approximate coordinates and any visible text, labels, or identifiers associated with this element."
-  - caller: "behave-automation"
+  - caller: "pytest-automation"
 ```
 
 **Step 3: Use Coordinates for Element Location**

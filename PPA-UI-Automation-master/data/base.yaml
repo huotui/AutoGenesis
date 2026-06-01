@@ -1,0 +1,10 @@
+test_pytest:
+  goto: https://www.baidu.com/
+  fills: pytest
+  path: ./log/screenshot/
+  fileName: test_pytest
+test_allure:
+  goto: https://www.baidu.com/
+  fills: allure
+  path: ./log/screenshot/
+  fileName: test_allure

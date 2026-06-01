@@ -10,8 +10,8 @@ import time
 import uuid
 from pathlib import Path
 from utils.logger import log_tool_call
-from utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
-from utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
+from utils.gen_code import PYTEST_HEADER_TEMPLATE, TESTCASE_DIR, TARGET_TEST_FILE_DEFAULT
+from utils.gen_code import gen_code_preview
 from utils.response_format import format_tool_response, init_tool_response
 from utils.logger import get_mcp_logger
 
@@ -52,20 +52,21 @@ def register_gen_code_tools(mcp, session_manager):
             logger.info(f"[GEN CODE START]:{session_manager.gen_code_id}")
         
             if step_file and step_file.endswith('.py'):
-                session_manager.steps_dir = parse_steps_dir_from_step_path(step_file)
                 session_manager.step_file_target = step_file
             elif feature_file:
-                session_manager.steps_dir, session_manager.step_file_target = gen_step_file_from_feature_path(feature_file)
+                feature_name = Path(feature_file).stem
+                test_file_name = f"test_{feature_name}.py"
+                session_manager.step_file_target = os.path.join(TESTCASE_DIR, test_file_name)
             else:
-                session_manager.steps_dir = STEPS_DIR_DEFAULT
-                session_manager.step_file_target = TARGET_STEP_FILE_DEFAULT
+                session_manager.step_file_target = TARGET_TEST_FILE_DEFAULT
+
+            session_manager.steps_dir = TESTCASE_DIR
 
             resp["status"] = "success"
             resp["data"] = {
                 "gen_code_id": session_manager.gen_code_id,
                 "steps_dir": session_manager.steps_dir,
                 "step_file_target": session_manager.step_file_target,
-                # "gen_code_cache": session_manager.gen_code_cache,
             }
         except Exception as e:
             resp["error"] = f"Error during code generation: {repr(e)}"
@@ -94,7 +95,7 @@ def register_gen_code_tools(mcp, session_manager):
     @mcp.tool()
     @log_tool_call
     async def confirm_code_changes() -> str:
-        """Confirm the previewed code changes"""
+        """Confirm the previewed code changes and generate pytest test file"""
         resp = init_tool_response()
         
         if not hasattr(session_manager, 'proposed_changes') or not session_manager.proposed_changes:
@@ -102,82 +103,78 @@ def register_gen_code_tools(mcp, session_manager):
             resp["data"] = {"message": "No pending code changes to confirm"}
             return json.dumps(format_tool_response(resp))
         
-        if not ensure_step_path_exists(session_manager.step_file_target):
-            resp["status"] = "error"
-            resp["error"] = f"Failed to create directory structure for {session_manager.step_file_target}"
-            return json.dumps(format_tool_response(resp))
-        
         try:
-            from utils.gen_code import extract_step_patterns, check_step_pattern_exists
-            from utils.gen_code import extract_steps_from_cache
+            test_file_path = Path(session_manager.step_file_target)
             
-            # 重新扫描现有步骤模式，确保最新状态
-            step_file = session_manager.steps_dir
-            existing_patterns = extract_step_patterns(step_file)
+            test_func_name = getattr(session_manager, 'test_func_name', 
+                                    f"test_{session_manager.gen_code_id.replace('-', '_')[:30]}")
             
-            # 从缓存中提取步骤并检查冲突
-            steps = extract_steps_from_cache(session_manager.gen_code_id, session_manager.gen_code_cache)
+            scenario_name = ""
+            if session_manager.gen_code_cache:
+                first_step = session_manager.gen_code_cache[0]
+                scenario_name = first_step.get("scenario", "自动生成的测试场景")
             
-            # 检查是否有步骤会冲突
-            conflict_steps = []
-            for item in steps:
-                step_text = item.get('step_text', '')
-                step_type = item.get('step_type', '')
-                if check_step_pattern_exists(step_type, step_text, existing_patterns):
-                    conflict_steps.append(f"{step_type}('{step_text}')")
+            if not scenario_name:
+                scenario_name = "自动生成的测试场景"
             
-            if conflict_steps:
-                logger.warning(f"Potential conflicts detected: {conflict_steps}")
+            test_content = PYTEST_HEADER_TEMPLATE + "\n"
+            test_content += f'\n\n@allure.epic("{scenario_name}")\n'
+            test_content += f'@allure.title("{scenario_name}")\n'
+            test_content += f'@pytest.mark.asyncio\n'
+            test_content += f'async def {test_func_name}():\n'
+            test_content += f'    """{scenario_name}"""\n'
+            test_content += f'    client = MCPClient()\n'
+            test_content += f'    \n'
+            test_content += f'    try:\n'
+            test_content += f'        await client.connect()\n'
+            test_content += f'        \n'
+            test_content += f'        await asyncio.sleep(2)\n'
             
-            # 读取现有文件内容
-            existing_content = ""
-            step_file_path = Path(session_manager.step_file_target)
-            if step_file_path.exists():
-                existing_content = step_file_path.read_text(encoding='utf-8')
+            has_screenshot = False
+            for step_code in session_manager.proposed_changes:
+                test_content += step_code + "\n"
+                if "screenshot" in step_code:
+                    has_screenshot = True
             
-            # 使用精确的步骤代码去重
-            new_steps_to_write = []
-            for item in session_manager.proposed_changes:
-                if not item.strip():
-                    continue
-                    
-                # 提取步骤装饰器模式进行精确匹配
-                import re
-                step_patterns = re.findall(r'@(given|when|then|step)\s*\(\s*["\'](.+?)["\']\s*\)', item)
-                
-                is_duplicate = False
-                for pattern_type, pattern_text in step_patterns:
-                    if check_step_pattern_exists(pattern_type, pattern_text, existing_patterns):
-                        is_duplicate = True
-                        logger.info(f"Skipping duplicate step: {pattern_type}('{pattern_text}')")
-                        break
-                
-                if not is_duplicate:
-                    new_steps_to_write.append(item)
+            if not has_screenshot:
+                test_content += f'        \n'
+                test_content += f'        screenshot_path = os.path.join(\n'
+                test_content += f'            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),\n'
+                test_content += f'            "log",\n'
+                test_content += f'            "screenshot",\n'
+                test_content += f'            "{test_func_name}.png"\n'
+                test_content += f'        )\n'
+                test_content += f'        await client.screenshot(\n'
+                test_content += f'            file_path=screenshot_path,\n'
+                test_content += f'            step="Take screenshot",\n'
+                test_content += f'            scenario="{scenario_name}"\n'
+                test_content += f'        )\n'
+                test_content += f'        readAttach_mcp(screenshot_path, "{test_func_name}")\n'
             
-            # 写入文件
-            with open(session_manager.step_file_target, 'w', encoding='utf-8') as f:
-                f.write(existing_content)
-                if hasattr(session_manager, 'header_code') and session_manager.header_code:
-                    if not existing_content:
-                        f.write(session_manager.header_code + "\n")
-                for item in new_steps_to_write:
-                    f.write(item + "\n")
+            test_content += f'    \n'
+            test_content += f'    finally:\n'
+            test_content += f'        await client.close()\n'
             
-            result = f"Applied {len(new_steps_to_write)} new steps to {session_manager.step_file_target}"
-            if conflict_steps:
-                result += f" ({len(conflict_steps)} conflicts skipped)"
+            test_file_path.parent.mkdir(parents=True, exist_ok=True)
+            test_file_path.write_text(test_content, encoding='utf-8')
             
-            session_manager.new_steps_count = len(new_steps_to_write)
+            session_manager.new_steps_count = len(session_manager.proposed_changes)
             resp["status"] = "success"
-            resp["data"] = {"message": result, "new_steps_count": session_manager.new_steps_count}
+            resp["data"] = {
+                "message": f"Generated pytest test file: {test_file_path}",
+                "new_steps_count": session_manager.new_steps_count,
+                "test_file_path": str(test_file_path),
+                "test_func_name": test_func_name
+            }
+            logger.info(f"Successfully generated test file: {test_file_path}")
         except Exception as e:
-            result = f"Error applying changes to {session_manager.step_file_target}: {str(e)}"
+            result = f"Error generating test file: {str(e)}"
             logger.error(result)
             resp["status"] = "error"
             resp["error"] = result
+            import traceback
+            logger.error(traceback.format_exc())
         
-        # Clear the proposed changes
         session_manager.clear_gen_code_cache()
         return json.dumps(format_tool_response(resp))
 

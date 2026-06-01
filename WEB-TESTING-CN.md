@@ -15,11 +15,10 @@
 7. [编写测试用例](#编写测试用例)
 8. [生成测试代码](#生成测试代码)
 9. [运行测试](#运行测试)
-10. [重试配置策略](#重试配置策略)
-11. [可用的 MCP 工具](#可用的-mcp-工具)
-12. [BDD 测试流程详解](#bdd-测试流程详解)
-13. [高级配置](#高级配置)
-14. [常见问题排查](#常见问题排查)
+10. [可用的 MCP 工具](#可用的-mcp-工具)
+11. [Pytest 测试流程详解](#pytest-测试流程详解)
+12. [高级配置](#高级配置)
+13. [常见问题排查](#常见问题排查)
 
 ---
 
@@ -29,7 +28,7 @@ AutoGenesis Web 测试模块提供以下核心功能：
 
 - 🤖 **AI 辅助测试生成** - 基于 MCP 协议，AI 自动生成测试脚本
 - 🌐 **多浏览器支持** - Chromium、Firefox、WebKit
-- 🎯 **BDD 格式支持** - 自动生成行为驱动开发（BDD）格式的测试代码
+- 🎯 **Pytest 格式支持** - 自动生成 pytest 格式的测试代码
 - 📸 **截图与分析** - 支持截图和 AI 截图分析功能
 - 🔍 **高级元素定位** - 支持 CSS、XPath 等多种定位策略
 - 🖱️ **丰富元素交互** - 支持点击、输入、悬停、滚动等操作
@@ -248,68 +247,61 @@ stdio 模式通常由 VS Code 自动启动和管理，不需要手动运行。
 }
 ```
 
-### 指定 Behave 测试的 MCP 服务器名称
-
-运行 behave 测试时，测试框架会自动从 `.vscode/mcp.json` 中发现名称以 `auto-genesis` 开头的 MCP 服务器。
-
-如果配置了多个 MCP 服务器，可以通过编辑 `behave-demo/features/environment.py` 指定确切的服务器名称：
-
-```python
-# 设置为 .vscode/mcp.json 中的特定服务器名称以使用它。
-# 留空则自动发现（优先 stdio 模式，匹配 "auto-genesis" 前缀）。
-AUTO_GENESIS_MCP_SERVER = 'auto-genesis-mcp-web'
-```
-
 ---
 
 ## 编写测试用例
 
-### Gherkin 语法基础
+### Pytest 测试用例格式
 
-BDD 测试使用 Gherkin 语法编写，基本结构如下：
+测试用例使用 pytest 格式编写，基本结构如下：
 
-```gherkin
-Feature: 功能名称
-  作为某个角色
-  我想要执行某些操作
-  以便于实现某个业务目标
+```python
+import allure
+from common.attach import readAttach
+from playwright.sync_api import Page
 
-  Scenario: 场景名称
-    Given 前置条件
-    When 执行操作
-    Then 验证结果
-    And 额外验证
+
+@allure.epic("模块名称")
+@allure.title("测试场景标题")
+def test_scenario_name(page: Page):
+    # 测试步骤
+    page.goto("https://example.com")
+    page.locator("#selector").click()
+    page.locator("#selector").fill("text")
+    # 截图并附加到 Allure 报告
+    readAttach(page, "./log/screenshot/", "test_scenario_name")
 ```
 
 ### 示例：Web 测试用例
 
-创建 `behave-demo/features/web_test.feature`：
+创建 `PPA-UI-Automation-master/testcase/test_web.py`：
 
-```gherkin
-Feature: Web 浏览器测试
+```python
+import allure
+from common.attach import readAttach
+from playwright.sync_api import Page
 
-  Scenario: 验证百度标题
-    Given 我导航到 "https://www.baidu.com"
-    When 我获取页面标题
-    Then 页面标题应包含 "百度"
 
-  Scenario: 验证 example.com 元素
-    Given 我导航到 "https://example.com"
-    Then 我应该看到页面标题
-
-  Scenario: 验证页面文本
-    Given 我导航到 "https://example.com"
-    Then 我应该看到文本 "Example Domain"
+@allure.epic("Web 浏览器测试")
+@allure.title("验证百度标题")
+def test_baidu_title(page: Page):
+    page.goto("https://www.baidu.com/")
+    page.locator("#kw").click()
+    page.locator("#kw").fill("playwright")
+    page.get_by_role("button", name="百度一下").click()
+    readAttach(page, "./log/screenshot/", "test_baidu_title")
 ```
 
-### 常用步骤关键词
+### 常用页面操作
 
-| 关键词 | 说明 | 示例 |
-|--------|------|------|
-| `Given` | 前置条件 | `Given 我导航到 "https://example.com"` |
-| `When` | 执行操作 | `When 我点击搜索按钮` |
-| `Then` | 验证结果 | `Then 页面应包含搜索结果` |
-| `And` | 额外步骤 | `And 我应该看到文本 "结果"` |
+| 操作 | 方法 | 示例 |
+|------|------|------|
+| 导航到 URL | `page.goto(url)` | `page.goto("https://example.com")` |
+| 点击元素 | `page.locator(selector).click()` | `page.locator("#button").click()` |
+| 输入文本 | `page.locator(selector).fill(text)` | `page.locator("#input").fill("text")` |
+| 获取文本 | `page.locator(selector).text_content()` | `page.locator("#title").text_content()` |
+| 等待元素 | `page.wait_for_selector(selector)` | `page.wait_for_selector("#element")` |
+| 截图 | `page.screenshot(path=path)` | `page.screenshot(path="screenshot.png")` |
 
 ---
 
@@ -319,10 +311,10 @@ Feature: Web 浏览器测试
 
 项目提供了预配置的 skill 来简化测试执行流程。
 
-#### 使用 autoGenesis-run skill
+#### 使用 autoGenesis-web skill
 
 ```
-使用 skill autoGenesis-run 执行场景：测试 bing.com 网站
+使用 skill autoGenesis-web 执行场景：测试 bing.com 网站
 ```
 
 Skill 会自动完成：
@@ -330,134 +322,65 @@ Skill 会自动完成：
 2. 解析所有场景步骤
 3. 通过 MCP 工具调用执行每个步骤
 4. 处理重试逻辑和错误恢复
-5. 生成 BDD 测试代码
-6. 将生成的代码保存到项目中
+5. 生成 pytest 测试代码
+6. 将生成的代码保存到 `PPA-UI-Automation-master/testcase/` 目录中
 
-### 手动编写 Step Definitions
+### 手动编写测试用例
 
-如果需要手动编写步骤定义，创建 `behave-demo/features/steps/web_steps.py`：
+如果需要手动编写测试用例，创建 `PPA-UI-Automation-master/testcase/test_web.py`：
 
 ```python
-from behave import given, when, then
+import allure
+from common.attach import readAttach
+from playwright.sync_api import Page
 
-@given('我导航到 "{url}"')
-def step_impl(context, url):
-    # 调用 MCP 工具导航到 URL
-    result = context.session.call_tool(
-        name="browser_navigate",
-        arguments={'caller': 'behave', 'url': url}
-    )
-    # 处理结果...
 
-@when('我获取页面标题')
-def step_impl(context):
-    # 调用 MCP 工具获取页面标题
-    result = context.session.call_tool(
-        name="get_page_title",
-        arguments={'caller': 'behave'}
-    )
-    # 处理结果...
-
-@then('页面标题应包含 "{text}"')
-def step_impl(context, text):
-    # 验证页面标题
-    # ...
+@allure.epic("Web 测试")
+@allure.title("导航到百度")
+def test_navigate_to_baidu(page: Page):
+    page.goto("https://www.baidu.com")
+    readAttach(page, "./log/screenshot/", "test_navigate_to_baidu")
 ```
 
 ---
 
 ## 运行测试
 
-### 安装 behave-demo 依赖
+### 安装依赖
 
 ```powershell
-cd behave-demo
-uv sync
+cd PPA-UI-Automation-master
+pip install playwright pytest allure-pytest
+playwright install
 ```
 
-### 运行特定场景
+### 运行特定测试
 
 ```powershell
-# 运行特定场景
-uv run behave --name "验证百度标题"
+# 运行特定测试文件
+pytest testcase/test_采购.py -vs
 
-# 运行整个 feature 文件
-uv run behave features/web_test.feature
+# 运行特定测试函数
+pytest testcase/test_采购.py::test_playwright -vs
 
 # 运行所有测试
-uv run behave
+pytest -vs --alluredir=./reports/tmp --clean-alluredir
 ```
 
 ### 常用运行选项
 
 ```powershell
-# 生成 JSON 报告
-uv run behave --format json -o reports/results.json
+# 生成 Allure 报告
+pytest -vs --alluredir=./reports/tmp --clean-alluredir
 
-# 使用标签过滤
-uv run behave --tags=@smoke
+# 使用标记过滤
+pytest -vs -m smoke
 
 # 详细输出
-uv run behave -v
+pytest -v
 
-# 不捕获输出（实时查看日志）
-uv run behave --no-capture
-
-# 停止在第一个失败
-uv run behave --stop
-```
-
-### 重试配置策略
-
-测试框架支持可配置的重试策略，用于处理不稳定的测试：
-
-#### 重试模式
-
-| 模式 | 说明 | 行为 |
-|------|------|------|
-| `step`（默认） | 单步重试 | 仅重试失败的 step，不会重新执行整个场景 |
-| `scenario` | 场景重试 | 任何 step 失败时，从头开始重新执行整个场景 |
-
-#### 通过环境变量配置
-
-```powershell
-# 设置重试模式：step 或 scenario
-$env:RETRY_MODE = "step"
-
-# 设置最大重试次数（默认：0 = 不重试）
-$env:RETRY_MAX_ATTEMPTS = "3"
-```
-
-#### 使用示例
-
-```powershell
-# 单步重试，最多重试 3 次
-$env:RETRY_MODE = "step"
-$env:RETRY_MAX_ATTEMPTS = "3"
-uv run behave
-
-# 场景重试，最多重试 2 次（重新执行整个场景）
-$env:RETRY_MODE = "scenario"
-$env:RETRY_MAX_ATTEMPTS = "2"
-uv run behave
-
-# 不重试（默认行为）
-uv run behave
-```
-
-#### 重试行为说明
-
-- **单步重试模式**：当某个 step 失败时，仅重试该 step，最多重试配置的次数。场景中的其他 step 不会重新执行。
-- **场景重试模式**：当任何 step 失败时，整个场景从第一个 step 开始重新执行，最多重试配置的次数。
-- **默认设置**：默认不启用任何重试（`RETRY_MAX_ATTEMPTS=0`）
-
-#### 重试输出示例
-
-```
-============================================================
-STEP RETRY: 'I should see the borrow success message' failed (attempt 1/3)
-Retrying step...
-============================================================
+# 生成 HTML 报告并启动服务
+python run.py
 ```
 
 ### 查看测试结果
@@ -465,21 +388,10 @@ Retrying step...
 成功的测试输出示例：
 
 ```
-Feature: Web 浏览器测试 # features/web_test.feature
+==================================== test session starts ====================================
+testcase/test_采购.py::test_playwright PASSED
 
-  Scenario: 验证百度标题
-    Given 我导航到 "https://www.baidu.com"
-    When 我获取页面标题
-    Then 页面标题应包含 "百度"
-
-  Scenario: 验证 example.com 元素
-    Given 我导航到 "https://example.com"
-    Then 我应该看到页面标题
-
-1 feature passed, 0 failed, 0 skipped
-2 scenarios passed, 0 failed, 0 skipped
-5 steps passed, 0 failed, 0 skipped
-Took 0m5.077s
+================================== 1 passed in 5.07s =========================================
 ```
 
 ---
@@ -531,72 +443,6 @@ Took 0m5.077s
 | `screenshot` | 截取截图 | `file_path`（可选） |
 | `execute_javascript` | 执行 JavaScript 代码 | `script`（字符串） |
 
-### 文件上传与下载
-
-| 工具名称 | 说明 | 参数 |
-|----------|------|------|
-| `upload_file` | 上传单个或多个文件到文件输入元素 | `locator_value`、`file_paths`（列表）、`locator_strategy` |
-| `wait_for_download` | 等待下载完成并返回下载文件信息 | `download_dir`（可选）、`timeout`（毫秒，默认30000） |
-| `verify_download_exists` | 验证文件是否已下载成功 | `file_name`（可选）、`download_dir`（可选） |
-
-**文件上传示例：**
-
-```python
-# 上传单个文件
-upload_file(
-    locator_value="#file-input",
-    locator_strategy="css",
-    file_paths=["/absolute/path/to/file.txt"]
-)
-
-# 上传多个文件
-upload_file(
-    locator_value="#file-input",
-    locator_strategy="css",
-    file_paths=["/path/to/file1.txt", "/path/to/file2.pdf"]
-)
-```
-
-**文件下载示例：**
-
-```python
-# 等待下载完成（使用默认下载目录）
-wait_for_download(
-    timeout=30000
-)
-
-# 等待下载完成（指定下载目录）
-wait_for_download(
-    download_dir="./downloads",
-    timeout=30000
-)
-
-# 验证特定文件已下载
-verify_download_exists(
-    file_name="downloaded_file.pdf",
-    download_dir="./downloads"
-)
-
-# 验证下载目录中是否有任何文件
-verify_download_exists(
-    download_dir="./downloads"
-)
-```
-
-**配置文件设置：**
-
-在 `conf/playwright_conf.json` 中可以配置下载目录：
-
-```json
-{
-  "browser": {
-    "browser_name": "chromium",
-    "headless": false,
-    "download_dir": "./downloads"
-  }
-}
-```
-
 ### 代码生成工具
 
 | 工具名称 | 说明 | 参数 |
@@ -607,26 +453,32 @@ verify_download_exists(
 
 ---
 
-## BDD 测试流程详解
+## Pytest 测试流程详解
 
-### 什么是 BDD？
+### 什么是 Pytest？
 
-行为驱动开发（BDD）是一种软件开发流程，通过使用自然语言描述系统行为来促进团队协作。
+Pytest 是一个 Python 测试框架，支持简单的单元测试和复杂的功能测试。
 
 ### 完整测试流程
 
-#### 1. 编写 Feature 文件
+#### 1. 编写测试用例
 
-使用 Gherkin 语法描述测试场景：
+使用 pytest 格式编写测试用例：
 
-```gherkin
-Feature: 百度搜索功能
+```python
+import allure
+from common.attach import readAttach
+from playwright.sync_api import Page
 
-  Scenario: 搜索关键词
-    Given 我导航到 "https://www.baidu.com"
-    When 我在搜索框输入 "AutoGenesis"
-    And 我点击搜索按钮
-    Then 搜索结果应包含 "AutoGenesis"
+
+@allure.epic("百度搜索功能")
+@allure.title("搜索关键词")
+def test_search_keyword(page: Page):
+    page.goto("https://www.baidu.com")
+    page.locator("#kw").click()
+    page.locator("#kw").fill("AutoGenesis")
+    page.get_by_role("button", name="百度一下").click()
+    readAttach(page, "./log/screenshot/", "test_search_keyword")
 ```
 
 #### 2. 配置 MCP 服务器
@@ -655,20 +507,20 @@ Feature: 百度搜索功能
 }
 ```
 
-#### 3. 生成 Step Definitions
+#### 3. 生成测试代码
 
-AI 会自动生成步骤定义代码，或手动创建 `features/steps/web_steps.py`。
+AI 会自动生成 pytest 测试代码，或手动创建 `testcase/test_web.py`。
 
 #### 4. 运行测试
 
 ```powershell
-cd behave-demo
-uv run behave features/baidu_search.feature
+cd PPA-UI-Automation-master
+pytest testcase/test_web.py -vs
 ```
 
 #### 5. 查看结果
 
-检查测试执行结果和报告。
+检查测试执行结果和 Allure 报告。
 
 ### 元素定位策略
 
@@ -685,13 +537,13 @@ Playwright 支持多种元素定位策略：
 
 ```python
 # CSS 选择器
-click_element(locator_value="input[name='wd']", locator_strategy="css")
+page.locator("input[name='wd']").click()
 
 # XPath
-click_element(locator_value="//input[@name='wd']", locator_strategy="xpath")
+page.locator("//input[@name='wd']").click()
 
 # ID
-click_element(locator_value="search-box", locator_strategy="id")
+page.locator("#search-box").click()
 ```
 
 ---
@@ -865,165 +717,33 @@ uv run playwright install
 
 **常见问题：**
 
-1. **元素尚未加载** - 增加超时时间或使用 `wait_for_element`
+1. **元素尚未加载** - 增加超时时间或使用 `page.wait_for_selector()`
 2. **定位器不正确** - 检查 CSS/XPath 表达式
-3. **元素在 iframe 中** - 需要先切换到 iframe
-4. **元素被遮挡** - 使用 JavaScript 点击
+3. **元素被遮挡** - 使用滚动或其他操作使元素可见
 
 **解决方案：**
 
 ```python
-# 等待元素出现
-wait_for_element(locator_value="input[name='wd']", locator_strategy="css", timeout=10000)
+# 等待元素加载
+page.wait_for_selector("#element", timeout=10000)
 
-# 使用更具体的定位器
-click_element(locator_value="#search-form input[name='wd']", locator_strategy="css")
+# 滚动到元素
+page.locator("#element").scroll_into_view_if_needed()
+
+# 使用不同的定位策略
+page.locator("text=按钮文本").click()
 ```
 
-### 元素不可交互
+### 测试失败
 
-某些元素可能需要先点击或悬停才能交互：
-
-```python
-# 先点击父元素
-click_element(locator_value="parent-element", locator_strategy="css")
-
-# 然后输入文本
-send_keys(locator_value="input[name='wd']", text="搜索内容", locator_strategy="css")
-```
-
-### 权限问题
-
-- 确保浏览器有权限启动
-- 某些网站可能需要登录或 Cookie
-
-### AI 客户端无法识别 MCP 工具
-
-- 重启 VS Code 或 Cursor
-- 检查 MCP 配置文件路径是否正确
-- 确认 MCP 服务器已成功启动
-- 验证 Python 路径配置
-
-### 生成的代码无法运行
-
-以详细模式运行测试查看日志：
+**查看测试日志：**
 
 ```powershell
-uv run behave -v
+pytest testcase/test_web.py -vs
 ```
 
-检查：
-1. 浏览器配置文件是否正确
-2. 浏览器是否正常启动
-3. MCP 服务器是否正常运行
-4. 网络连接是否正常
-
-### 端口占用问题
-
-如果启动服务时提示端口被占用，可以关闭占用端口的程序：
+**查看 Allure 报告：**
 
 ```powershell
-# 查找占用端口的进程
-netstat -ano | findstr :8000
-
-# 关闭进程（替换 PID 为实际进程 ID）
-taskkill /PID <PID> /F
+allure serve ./reports/tmp
 ```
-
-### 超时问题
-
-增加超时时间：
-
-**在配置文件中：**
-
-```json
-{
-  "browser": {
-    "timeout": 60000
-  }
-}
-```
-
-**在代码中：**
-
-```python
-wait_for_element(locator_value="selector", timeout=30000)
-```
-
----
-
-## 项目结构
-
-```
-playwright-mcp-server/
-├── simple_server.py       # MCP 服务器主程序
-├── playwright_session.py  # Playwright 会话管理器
-├── pyproject.toml         # uv/项目配置
-├── requirements.txt       # 依赖列表
-├── conf/                  # 配置目录
-│   ├── playwright_conf.json        # 浏览器配置
-│   └── playwright_conf.template.json  # 配置模板
-├── tools/                 # 工具模块
-│   ├── playwright_tool.py # Playwright 自动化工具
-│   ├── gen_code_tool.py   # 代码生成工具
-│   └── verify_tools.py    # 验证工具
-├── llm/                   # LLM 集成
-│   ├── prompt.py          # LLM 提示词模板
-│   └── chat.py            # LLM 聊天接口
-├── utils/                 # 工具函数
-├── logs/                  # 日志目录
-└── WEB-README.md          # 文档（本文件）
-```
-
----
-
-## 示例测试用例
-
-### 示例 1：验证页面标题
-
-```gherkin
-Feature: 页面标题验证
-
-  Scenario: 验证百度标题
-    Given 我导航到 "https://www.baidu.com"
-    When 我获取页面标题
-    Then 页面标题应包含 "百度"
-```
-
-### 示例 2：验证元素存在
-
-```gherkin
-Feature: 元素存在验证
-
-  Scenario: 验证 example.com 有标题
-    Given 我导航到 "https://example.com"
-    Then 我应该看到页面标题
-```
-
-### 示例 3：验证页面文本
-
-```gherkin
-Feature: 页面文本验证
-
-  Scenario: 验证 example.com 文本
-    Given 我导航到 "https://example.com"
-    Then 我应该看到文本 "Example Domain"
-```
-
----
-
-## 贡献指南
-
-本项目欢迎贡献和建议。详情请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
----
-
-## 联系方式
-
-如有疑问或建议，请联系：autogenesis@microsoft.com
-
----
-
-## 许可证
-
-请参阅 [LICENSE](LICENSE) 了解许可证信息。
